@@ -1,4 +1,6 @@
 from agents.news_agent import NewsAgent
+from agents.market_agent import MarketAgent
+
 
 
 class ManagerAgent:
@@ -7,7 +9,11 @@ class ManagerAgent:
     def __init__(self):
 
         self.agents = [
-            NewsAgent()
+
+            NewsAgent(),
+
+            MarketAgent()
+
         ]
 
 
@@ -15,11 +21,12 @@ class ManagerAgent:
 
         results = []
 
+
         for agent in self.agents:
 
-            result = agent.run()
-
-            results.append(result)
+            results.append(
+                agent.run()
+            )
 
 
         return results
