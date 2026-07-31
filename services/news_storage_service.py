@@ -65,6 +65,8 @@ class NewsStorageService:
                     category,
                     published_at,
                     hash,
+                    impact_score,
+                    impact,
                     created_at
                 )
                 VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -72,10 +74,11 @@ class NewsStorageService:
                 (
                     title,
                     link,
-                    article.get("source", ""),
-                    article.get("category", "unknown"),
+                    article.get("category", "GENERAL"),
                     article.get("published", ""),
                     news_hash,
+                    article.get("impact_score", 0),
+                    article.get("impact", "LOW"),
                     datetime.utcnow().isoformat()
                 )
             )
