@@ -18,36 +18,40 @@ class NewsStorageService:
 
         new_articles = []
 
-        connection = self.db.connection
-
-        cursor = connection.cursor()
+        cursor = self.db.connection.cursor()
 
 
         for article in articles:
 
             title = article.get("title", "")
+            link = article.get("link", "")
+
 
             if not title:
                 continue
 
 
-            news_hash = generate_hash(title)
+            unique_text = title + link
+
+            news_hash = generate_hash(
+                unique_text
+            )
 
 
             cursor.execute(
                 """
-                SELECT id
-                FROM news
+                SELECT id 
+                FROM news 
                 WHERE hash = ?
                 """,
                 (news_hash,)
             )
 
 
-            existing = cursor.fetchone()
+            exists = cursor.fetchone()
 
 
-            if existing:
+            if exists:
                 continue
 
 
@@ -67,7 +71,7 @@ class NewsStorageService:
                 """,
                 (
                     title,
-                    article.get("link"),
+                    link,
                     article.get("source", ""),
                     article.get("category", "unknown"),
                     article.get("published", ""),
@@ -80,7 +84,7 @@ class NewsStorageService:
             new_articles.append(article)
 
 
-        connection.commit()
+        self.db.connection.commit()
 
 
         logger.info(
@@ -89,6 +93,7 @@ class NewsStorageService:
 
 
         return new_articles
+
 
 
     def close(self):
