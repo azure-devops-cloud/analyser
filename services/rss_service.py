@@ -1,5 +1,6 @@
 import feedparser
 
+
 class RSSService:
 
     @staticmethod
@@ -11,14 +12,12 @@ class RSSService:
 
         for entry in feed.entries:
 
-            articles.append({
-
-                "title": entry.get("title"),
-
-                "link": entry.get("link"),
-
-                "published": entry.get("published", "")
-
-            })
+            articles.append(
+                {
+                    "title": entry.get("title", ""),
+                    "link": entry.get("link", ""),
+                    "published": entry.get("published", "")
+                }
+            )
 
         return articles
