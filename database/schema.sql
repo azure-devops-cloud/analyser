@@ -16,6 +16,10 @@ CREATE TABLE IF NOT EXISTS news (
 
     hash TEXT UNIQUE,
 
+    impact_score INTEGER,
+
+    impact TEXT,
+
     created_at TEXT DEFAULT CURRENT_TIMESTAMP
 
 );
