@@ -15,14 +15,15 @@ def main():
     )
 
 
+    # Database initialization
     db = DatabaseService()
 
     db.initialize()
 
-
     tables = db.health_check()
 
 
+    # Run Agents
     manager = ManagerAgent()
 
     results = manager.run()
@@ -30,102 +31,175 @@ def main():
 
 
     message = [
+
         "🚀 MarketMind AI",
+
         "",
-        "News Update",
+
+        "📊 Intelligence Report",
+
         ""
+
     ]
+
 
 
     for result in results:
 
 
-        if result.status == "success":
-    
-    
-            checked = result.data["total_checked"]
-    
-            analysis = result.data["analysis"]
-    
-    
-            message.append(
-                f"✅ {result.agent}"
-            )
-    
-    
-            message.append(
-                f"Checked: {checked}"
-            )
-    
-    
-            message.append(
-                f"New: {result.count}"
-            )
-    
-    
-            message.append("")
-    
-    
-            message.append(
-                "📊 Categories:"
-            )
-    
-    
-            for category, count in analysis["categories"].items():
-    
-                message.append(
-                    f"{category}: {count}"
-                )
-    
-    
-            message.append("")
-    
-    
-            message.append(
-                "🔥 Impact:"
-            )
-    
-    
-            for impact, count in analysis["impact"].items():
-    
-                message.append(
-                    f"{impact}: {count}"
-                )
-    
-    
-    
-        else:
-    
-    
+        if result.status != "success":
+
             message.append(
                 f"❌ {result.agent} failed"
             )
 
+            continue
+
+
+
+        # News Agent Report
+
+        if result.agent == "news_agent":
+
+
+            checked = result.data["total_checked"]
+
+            analysis = result.data["analysis"]
+
+
+            message.append(
+                "📰 News Intelligence"
+            )
+
+
+            message.append(
+                f"Checked: {checked}"
+            )
+
+
+            message.append(
+                f"New: {result.count}"
+            )
+
+
+            message.append("")
+
+
+            message.append(
+                "📂 Categories:"
+            )
+
+
+            for category, count in analysis["categories"].items():
+
+                message.append(
+                    f"{category}: {count}"
+                )
+
+
+            message.append("")
+
+
+            message.append(
+                "🔥 Impact:"
+            )
+
+
+            for impact, count in analysis["impact"].items():
+
+                message.append(
+                    f"{impact}: {count}"
+                )
+
+
+            message.append("")
+
+
+
+        # Market Agent Report
+
+        elif result.agent == "market_agent":
+
+
+            message.append(
+                "📈 Market Data"
+            )
+
+
+            message.append("")
+
+
+            for item in result.data:
+
+
+                change = item.get(
+                    "change",
+                    0
+                )
+
+
+                if change >= 0:
+
+                    icon = "🟢"
+
+                else:
+
+                    icon = "🔴"
+
+
+
+                message.append(
+
+                    f"{icon} "
+                    f"{item['name']}: "
+                    f"{item['price']} "
+                    f"({change}%)"
+
+                )
+
+
+            message.append("")
+
 
 
     message.extend(
+
         [
+
+            "💾 Database",
+
+            f"Tables: {len(tables)}",
+
             "",
-            f"Database tables: {len(tables)}",
-            "",
+
             "Status: Healthy ✅"
+
         ]
+
+    )
+
+
+
+    telegram_message = "\n".join(
+        message
     )
 
 
     send_message(
-        "\n".join(message)
+        telegram_message
     )
+
 
 
     db.close()
 
 
     logger.info(
-        "Completed"
+        "MarketMind AI completed"
     )
 
 
 
 if __name__ == "__main__":
+
     main()
