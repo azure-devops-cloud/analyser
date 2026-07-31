@@ -35,11 +35,59 @@ class DatabaseService:
             )
 
 
+        self.run_migrations()
+
+
         self.connection.commit()
+
 
         logger.info(
             "Database initialized"
         )
+
+
+    def run_migrations(self):
+
+        cursor = self.connection.cursor()
+
+
+        cursor.execute(
+            "PRAGMA table_info(news)"
+        )
+
+
+        columns = [
+            row[1]
+            for row in cursor.fetchall()
+        ]
+
+
+        if "impact_score" not in columns:
+
+            logger.info(
+                "Adding impact_score column"
+            )
+
+            cursor.execute(
+                """
+                ALTER TABLE news
+                ADD COLUMN impact_score INTEGER DEFAULT 0
+                """
+            )
+
+
+        if "impact" not in columns:
+
+            logger.info(
+                "Adding impact column"
+            )
+
+            cursor.execute(
+                """
+                ALTER TABLE news
+                ADD COLUMN impact TEXT DEFAULT 'LOW'
+                """
+            )
 
 
     def health_check(self):
@@ -57,6 +105,7 @@ class DatabaseService:
 
 
         return cursor.fetchall()
+
 
 
     def close(self):
