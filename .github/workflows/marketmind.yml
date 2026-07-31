@@ -8,6 +8,9 @@ jobs:
 
     runs-on: ubuntu-latest
 
+    permissions:
+      contents: write
+
     steps:
 
       - name: Checkout repository
@@ -32,3 +35,15 @@ jobs:
           PYTHONPATH: .
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+
+
+      - name: Save database changes
+        run: |
+          git config --global user.name "marketmind-ai-bot"
+          git config --global user.email "marketmind-ai-bot@users.noreply.github.com"
+
+          git add data/marketmind.db
+
+          git commit -m "chore: update market database" || echo "No database changes"
+
+          git push
