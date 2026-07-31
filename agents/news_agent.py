@@ -2,8 +2,11 @@ from agents.base_agent import BaseAgent
 from models.agent_result import AgentResult
 
 from config.rss_feeds import RSS_FEEDS
+
 from services.rss_service import RSSService
 from services.news_storage_service import NewsStorageService
+from services.classifier_service import ClassifierService
+
 
 
 class NewsAgent(BaseAgent):
@@ -16,16 +19,28 @@ class NewsAgent(BaseAgent):
 
         try:
 
+            classifier = ClassifierService()
+
+
             for category, feeds in RSS_FEEDS.items():
 
+
                 for feed in feeds:
+
 
                     results = RSSService.get_feed(feed)
 
 
                     for item in results:
 
-                        item["category"] = category
+
+                        item["source_category"] = category
+
+
+                        item = classifier.classify(
+                            item
+                        )
+
 
                         articles.append(item)
 
@@ -44,10 +59,15 @@ class NewsAgent(BaseAgent):
 
 
             return AgentResult(
+
                 agent="news_agent",
+
                 status="success",
+
                 data=new_articles,
+
                 count=len(new_articles)
+
             )
 
 
@@ -55,9 +75,13 @@ class NewsAgent(BaseAgent):
 
 
             return AgentResult(
+
                 agent="news_agent",
+
                 status="failed",
+
                 errors=[
                     str(error)
                 ]
+
             )
