@@ -1,8 +1,7 @@
 from agents.base_agent import BaseAgent
 from models.agent_result import AgentResult
 
-from services.market_service import MarketService
-
+from services.market_data_service import MarketDataService
 
 
 class MarketAgent(BaseAgent):
@@ -12,8 +11,7 @@ class MarketAgent(BaseAgent):
 
         try:
 
-            service = MarketService()
-
+            service = MarketDataService()
 
             data = service.get_market_data()
 
@@ -40,8 +38,6 @@ class MarketAgent(BaseAgent):
 
                 status="failed",
 
-                errors=[
-                    str(error)
-                ]
+                errors=[str(error)]
 
             )
