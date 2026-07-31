@@ -39,23 +39,63 @@ def main():
 
     for result in results:
 
+
         if result.status == "success":
     
+    
             checked = result.data["total_checked"]
+    
+            analysis = result.data["analysis"]
+    
     
             message.append(
                 f"✅ {result.agent}"
             )
     
+    
             message.append(
                 f"Checked: {checked}"
             )
+    
     
             message.append(
                 f"New: {result.count}"
             )
     
+    
+            message.append("")
+    
+    
+            message.append(
+                "📊 Categories:"
+            )
+    
+    
+            for category, count in analysis["categories"].items():
+    
+                message.append(
+                    f"{category}: {count}"
+                )
+    
+    
+            message.append("")
+    
+    
+            message.append(
+                "🔥 Impact:"
+            )
+    
+    
+            for impact, count in analysis["impact"].items():
+    
+                message.append(
+                    f"{impact}: {count}"
+                )
+    
+    
+    
         else:
+    
     
             message.append(
                 f"❌ {result.agent} failed"
