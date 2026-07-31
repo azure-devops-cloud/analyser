@@ -6,6 +6,7 @@ from config.rss_feeds import RSS_FEEDS
 from services.rss_service import RSSService
 from services.news_storage_service import NewsStorageService
 from services.classifier_service import ClassifierService
+from services.news_analysis_service import NewsAnalysisService
 from services.logger import get_logger
 
 
@@ -14,9 +15,11 @@ logger = get_logger(__name__)
 
 class NewsAgent(BaseAgent):
 
+
     def run(self):
 
         articles = []
+
 
         try:
 
@@ -27,6 +30,7 @@ class NewsAgent(BaseAgent):
 
                 for feed in feeds:
 
+
                     results = RSSService.get_feed(feed)
 
 
@@ -35,8 +39,9 @@ class NewsAgent(BaseAgent):
                         item["source_category"] = category
 
 
-                        # classify every article
-                        item = classifier.classify(item)
+                        item = classifier.classify(
+                            item
+                        )
 
 
                         articles.append(item)
@@ -44,7 +49,7 @@ class NewsAgent(BaseAgent):
 
 
             logger.info(
-                f"Total RSS articles: {len(articles)}"
+                f"RSS Articles Checked: {len(articles)}"
             )
 
 
@@ -59,7 +64,16 @@ class NewsAgent(BaseAgent):
             storage.close()
 
 
-            # Return all collected data for reporting
+
+            analyzer = NewsAnalysisService()
+
+
+            analysis = analyzer.analyze(
+                articles
+            )
+
+
+
             return AgentResult(
 
                 agent="news_agent",
@@ -67,8 +81,13 @@ class NewsAgent(BaseAgent):
                 status="success",
 
                 data={
+
                     "new_articles": new_articles,
-                    "total_checked": len(articles)
+
+                    "total_checked": len(articles),
+
+                    "analysis": analysis
+
                 },
 
                 count=len(new_articles)
@@ -79,7 +98,9 @@ class NewsAgent(BaseAgent):
         except Exception as error:
 
 
-            logger.error(str(error))
+            logger.error(
+                str(error)
+            )
 
 
             return AgentResult(
