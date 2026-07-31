@@ -10,8 +10,11 @@ logger = get_logger(__name__)
 
 class NewsStorageService:
 
+
     def __init__(self):
+
         self.db = DatabaseService()
+
 
 
     def save_news(self, articles):
@@ -23,25 +26,38 @@ class NewsStorageService:
 
         for article in articles:
 
-            title = article.get("title", "")
-            link = article.get("link", "")
+
+            title = article.get(
+                "title",
+                ""
+            )
+
+
+            link = article.get(
+                "link",
+                ""
+            )
 
 
             if not title:
+
                 continue
 
 
+
             unique_text = title + link
+
 
             news_hash = generate_hash(
                 unique_text
             )
 
 
+
             cursor.execute(
                 """
-                SELECT id 
-                FROM news 
+                SELECT id
+                FROM news
                 WHERE hash = ?
                 """,
                 (news_hash,)
@@ -52,7 +68,9 @@ class NewsStorageService:
 
 
             if exists:
+
                 continue
+
 
 
             cursor.execute(
@@ -69,22 +87,42 @@ class NewsStorageService:
                     impact,
                     created_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                VALUES
+                (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     title,
                     link,
-                    article.get("category", "GENERAL"),
-                    article.get("published", ""),
+                    article.get(
+                        "source",
+                        ""
+                    ),
+                    article.get(
+                        "category",
+                        "GENERAL"
+                    ),
+                    article.get(
+                        "published",
+                        ""
+                    ),
                     news_hash,
-                    article.get("impact_score", 0),
-                    article.get("impact", "LOW"),
+                    article.get(
+                        "impact_score",
+                        0
+                    ),
+                    article.get(
+                        "impact",
+                        "LOW"
+                    ),
                     datetime.utcnow().isoformat()
                 )
             )
 
 
-            new_articles.append(article)
+            new_articles.append(
+                article
+            )
+
 
 
         self.db.connection.commit()
