@@ -40,13 +40,23 @@ def main():
     for result in results:
 
         if result.status == "success":
-
+    
+            checked = result.data["total_checked"]
+    
             message.append(
-                f"✅ {result.agent}: {result.count} new articles"
+                f"✅ {result.agent}"
             )
-
+    
+            message.append(
+                f"Checked: {checked}"
+            )
+    
+            message.append(
+                f"New: {result.count}"
+            )
+    
         else:
-
+    
             message.append(
                 f"❌ {result.agent} failed"
             )
