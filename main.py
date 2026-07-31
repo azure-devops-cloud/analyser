@@ -1,17 +1,33 @@
-from datetime import datetime
+from services.database_service import DatabaseService
 from services.telegram_service import send_message
+from services.logger import get_logger
+
+logger = get_logger()
+
+logger.info("Starting MarketMind AI")
+
+db = DatabaseService()
+
+db.initialize()
+
+tables = db.health_check()
 
 message = f"""
 🚀 MarketMind AI
 
-Status: Online
+Database initialized successfully.
 
-GitHub Actions: SUCCESS
+Tables created:
 
-Time:
-{datetime.utcnow()} UTC
+{len(tables)}
 
-This message was sent automatically.
+Status
+
+Healthy ✅
 """
 
 send_message(message)
+
+db.close()
+
+logger.info("Execution completed.")
