@@ -1,6 +1,7 @@
 from services.database_service import DatabaseService
 from services.telegram_service import send_message
 from services.logger import get_logger
+from agents.news_agent import NewsAgent
 
 logger = get_logger()
 
@@ -31,3 +32,9 @@ send_message(message)
 db.close()
 
 logger.info("Execution completed.")
+
+agent = NewsAgent()
+
+articles = agent.run()
+
+print(f"Collected {len(articles)} articles")
