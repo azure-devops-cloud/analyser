@@ -1,40 +1,93 @@
 from services.database_service import DatabaseService
 from services.telegram_service import send_message
 from services.logger import get_logger
-from agents.news_agent import NewsAgent
+
+from agents.manager_agent import ManagerAgent
+
 
 logger = get_logger()
 
-logger.info("Starting MarketMind AI")
 
-db = DatabaseService()
+def main():
 
-db.initialize()
+    logger.info("Starting MarketMind AI")
 
-tables = db.health_check()
 
-message = f"""
-🚀 MarketMind AI
+    # Initialize Database
+    db = DatabaseService()
 
-Database initialized successfully.
+    db.initialize()
 
-Tables created:
+    tables = db.health_check()
 
-{len(tables)}
 
-Status
+    logger.info(
+        f"Database ready. Tables available: {len(tables)}"
+    )
 
-Healthy ✅
-"""
 
-send_message(message)
+    # Run Agents
+    manager = ManagerAgent()
 
-db.close()
+    results = manager.run()
 
-logger.info("Execution completed.")
 
-agent = NewsAgent()
+    message_lines = [
+        "🚀 MarketMind AI",
+        "",
+        "Agent Status",
+        ""
+    ]
 
-articles = agent.run()
 
-print(f"Collected {len(articles)} articles")
+    for result in results:
+
+        logger.info(
+            f"{result.agent} - {result.status}"
+        )
+
+
+        if result.status == "success":
+
+            message_lines.append(
+                f"✅ {result.agent}: {result.count} items"
+            )
+
+        else:
+
+            message_lines.append(
+                f"❌ {result.agent}: Failed"
+            )
+
+            logger.error(
+                result.errors
+            )
+
+
+    message_lines.extend(
+        [
+            "",
+            "Database:",
+            f"Tables: {len(tables)}",
+            "",
+            "Status: Healthy ✅"
+        ]
+    )
+
+
+    message = "\n".join(message_lines)
+
+
+    send_message(message)
+
+
+    db.close()
+
+
+    logger.info(
+        "MarketMind AI execution completed."
+    )
+
+
+if __name__ == "__main__":
+    main()
