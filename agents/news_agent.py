@@ -1,22 +1,43 @@
+from agents.base_agent import BaseAgent
+from models.agent_result import AgentResult
+
 from config.rss_feeds import RSS_FEEDS
 from services.rss_service import RSSService
 
-class NewsAgent:
+
+class NewsAgent(BaseAgent):
 
     def run(self):
 
-        news = []
+        articles = []
 
-        for category, feeds in RSS_FEEDS.items():
+        try:
 
-            for feed in feeds:
+            for category, feeds in RSS_FEEDS.items():
 
-                articles = RSSService.get_feed(feed)
+                for feed in feeds:
 
-                for article in articles:
+                    results = RSSService.get_feed(feed)
 
-                    article["category"] = category
+                    for item in results:
 
-                    news.append(article)
+                        item["category"] = category
 
-        return news
+                        articles.append(item)
+
+
+            return AgentResult(
+                agent="news_agent",
+                status="success",
+                data=articles,
+                count=len(articles)
+            )
+
+
+        except Exception as error:
+
+            return AgentResult(
+                agent="news_agent",
+                status="failed",
+                errors=[str(error)]
+            )
