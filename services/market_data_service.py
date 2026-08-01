@@ -1,6 +1,7 @@
 import yfinance as yf
 
 from services.logger import get_logger
+from services.technical_indicator_service import TechnicalIndicatorService
 
 
 logger = get_logger(__name__)
@@ -11,6 +12,7 @@ class MarketService:
     SYMBOLS = {
         "GOLD": "GC=F",
         "BITCOIN": "BTC-USD",
+        "ETHEREUM": "ETH-USD",
         "S&P500": "^GSPC",
         "NASDAQ": "^IXIC",
         "USD_INR": "INR=X",
@@ -25,53 +27,58 @@ class MarketService:
 
             try:
 
+                logger.info(f"Fetching {name}")
+
                 ticker = yf.Ticker(symbol)
 
                 data = ticker.history(
-                    period="5d",
+                    period="3mo",
+                    interval="1d",
                     auto_adjust=False
                 )
 
                 if data.empty:
 
-                    logger.warning(f"{name}: No data returned")
+                    logger.warning(f"{name}: No data")
 
                     continue
 
+                indicators = TechnicalIndicatorService.calculate(data)
+
+                if indicators is None:
+                    continue
+
                 latest = data.iloc[-1]
+                previous = data.iloc[-2]
 
-                price = round(float(latest["Close"]), 2)
-
-                if len(data) >= 2:
-
-                    previous = float(data.iloc[-2]["Close"])
-
-                    if previous != 0:
-
-                        change = round(
-                            ((price - previous) / previous) * 100,
-                            2
-                        )
-
-                    else:
-
-                        change = 0.0
-
-                else:
-
-                    change = 0.0
-
-                results.append(
-                    {
-                        "name": name,
-                        "symbol": symbol,
-                        "price": price,
-                        "change": change
-                    }
+                daily_change = round(
+                    (
+                        (latest["Close"] - previous["Close"])
+                        / previous["Close"]
+                    ) * 100,
+                    2
                 )
 
-            except Exception as error:
+                indicators["name"] = name
+                indicators["symbol"] = symbol
+                indicators["daily_change"] = daily_change
 
-                logger.error(f"{name}: {error}")
+                results.append(indicators)
+
+                logger.info(
+                    f"{name} | "
+                    f"{indicators['price']} | "
+                    f"{indicators['trend']}"
+                )
+
+            except Exception as ex:
+
+                logger.exception(
+                    f"{name}: {str(ex)}"
+                )
+
+        logger.info(
+            f"Collected {len(results)} market instruments"
+        )
 
         return results
