@@ -36,4 +36,4 @@ class AgentContext:
 
     def add_news_sentiment(self,data):
 
-    self.news_sentiment=data
+        self.news_sentiment=data
