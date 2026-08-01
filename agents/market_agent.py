@@ -1,7 +1,7 @@
 from agents.base_agent import BaseAgent
 from models.agent_result import AgentResult
 
-from services.market_data_service import MarketDataService
+from services.market_data_service import MarketService
 
 
 class MarketAgent(BaseAgent):
