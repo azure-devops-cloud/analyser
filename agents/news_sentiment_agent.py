@@ -45,6 +45,20 @@ class NewsSentimentAgent(BaseAgent):
 
         context.news = analysis
 
+        context.add_news_sentiment(
+
+            {
+        
+                "positive":positive,
+        
+                "negative":negative,
+        
+                "neutral":neutral
+        
+            }
+        
+        )
+
         return AgentResult(
 
             agent="news_sentiment_agent",
