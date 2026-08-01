@@ -15,6 +15,7 @@ class DecisionAgent(BaseAgent):
             decision = DecisionService()
 
             analysis = []
+            context.add_decisions(analysis)
 
             for item in market_data:
 
