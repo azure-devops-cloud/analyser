@@ -11,7 +11,7 @@ class MarketAgent(BaseAgent):
 
         try:
 
-            service = MarketDataService()
+            service = MarketService()
 
             data = service.get_market_data()
 
@@ -38,6 +38,8 @@ class MarketAgent(BaseAgent):
 
                 status="failed",
 
-                errors=[str(error)]
+                errors=[
+                    str(error)
+                ]
 
             )
