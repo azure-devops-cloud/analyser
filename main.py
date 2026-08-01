@@ -132,6 +132,31 @@ def main():
 
                 message.append("")
 
+        elif result.agent=="news_sentiment_agent":
+
+            message.append("😊 AI News Sentiment")
+        
+            message.append("")
+        
+            message.append(
+        
+                f"🟢 Positive : {result.data['positive']}"
+        
+            )
+        
+            message.append(
+        
+                f"🔴 Negative : {result.data['negative']}"
+        
+            )
+        
+            message.append(
+        
+                f"🟡 Neutral : {result.data['neutral']}"
+        
+            )
+
+    message.append("")
     # -----------------------------
     # Database
     # -----------------------------
