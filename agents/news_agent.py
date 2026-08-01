@@ -16,7 +16,7 @@ logger = get_logger(__name__)
 class NewsAgent(BaseAgent):
 
 
-    def run(self):
+    def run(self, context):
 
         articles = []
 
@@ -72,7 +72,7 @@ class NewsAgent(BaseAgent):
                 articles
             )
 
-
+            context.add_news(new_articles)
 
             return AgentResult(
 
