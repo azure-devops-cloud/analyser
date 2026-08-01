@@ -133,7 +133,7 @@ def main():
 
 
                 change = item.get(
-                    "change",
+                    "daily_change",
                     0
                 )
 
@@ -146,17 +146,13 @@ def main():
 
                     icon = "🔴"
 
-
-
-                message.append(
-
-                    f"{icon} "
-                    f"{item['name']}: "
-                    f"{item['price']} "
-                    f"({change}%)"
-
-                )
-
+                message.append(f"{icon} {item['name']}")
+                message.append(f"Price : {item['price']}")
+                message.append(f"Daily : {change}%")
+                message.append(f"Trend : {item['trend']}")
+                message.append(f"Signal: {item['signal']}")
+                message.append(f"RSI   : {item['rsi']}")
+                message.append("")
 
             message.append("")
 
