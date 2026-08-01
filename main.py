@@ -154,9 +154,27 @@ def main():
                 message.append(f"RSI   : {item['rsi']}")
                 message.append("")
 
+                
+
             message.append("")
+            
+        # Calendar Agent Report
 
-
+        elif result.agent == "calendar_agent":
+        
+            message.append("📅 Economic Calendar")
+        
+            message.append("")
+        
+            if len(result.data) == 0:
+        
+                message.append("No major events found.")
+        
+                message.append("")
+        
+            else:
+        
+                for event in result.data[:5]:    
 
     message.extend(
 
