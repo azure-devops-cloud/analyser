@@ -11,6 +11,8 @@ class AgentContext:
         self.calendar = []
 
         self.errors = []
+        
+        self.news_sentiment={}
 
     def add_news(self, news):
 
@@ -31,3 +33,7 @@ class AgentContext:
     def add_error(self, error):
 
         self.errors.append(error)
+
+    def add_news_sentiment(self,data):
+
+    self.news_sentiment=data
