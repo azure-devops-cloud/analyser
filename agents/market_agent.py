@@ -6,7 +6,6 @@ from services.market_data_service import MarketService
 
 class MarketAgent(BaseAgent):
 
-
     def run(self):
 
         try:
@@ -15,31 +14,17 @@ class MarketAgent(BaseAgent):
 
             data = service.get_market_data()
 
-
             return AgentResult(
-
                 agent="market_agent",
-
                 status="success",
-
                 data=data,
-
                 count=len(data)
-
             )
 
-
-        except Exception as error:
-
+        except Exception as ex:
 
             return AgentResult(
-
                 agent="market_agent",
-
                 status="failed",
-
-                errors=[
-                    str(error)
-                ]
-
+                errors=[str(ex)]
             )
