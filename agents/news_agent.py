@@ -72,26 +72,28 @@ class NewsAgent(BaseAgent):
                 articles
             )
 
-            context.add_news(new_articles)
+            context.add_news(articles)
 
             return AgentResult(
 
                 agent="news_agent",
-
+            
                 status="success",
-
+            
                 data={
-
+            
+                    "articles": articles,
+            
                     "new_articles": new_articles,
-
+            
                     "total_checked": len(articles),
-
+            
                     "analysis": analysis
-
+            
                 },
-
+            
                 count=len(new_articles)
-
+            
             )
 
 
