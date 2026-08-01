@@ -11,10 +11,7 @@ class DecisionAgent(BaseAgent):
 
         try:
 
-            market = MarketService()
-
-            market_data = market.get_market_data()
-
+            market_data = context.market
             decision = DecisionService()
 
             analysis = []
