@@ -1,3 +1,5 @@
+from models.context import AgentContext
+
 from agents.news_agent import NewsAgent
 from agents.market_agent import MarketAgent
 from agents.decision_agent import DecisionAgent
@@ -6,6 +8,8 @@ from agents.decision_agent import DecisionAgent
 class ManagerAgent:
 
     def __init__(self):
+
+        self.context = AgentContext()
 
         self.agents = [
 
@@ -23,10 +27,8 @@ class ManagerAgent:
 
         for agent in self.agents:
 
-            results.append(
+            result = agent.run(self.context)
 
-                agent.run()
+            results.append(result)
 
-            )
-
-        return results
+        return results, self.context
