@@ -17,6 +17,8 @@ class DatabaseService:
             DATABASE_PATH
         )
 
+        self.initialize()
+
 
     def initialize(self):
 

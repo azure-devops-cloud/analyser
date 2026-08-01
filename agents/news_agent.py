@@ -1,7 +1,7 @@
 from agents.base_agent import BaseAgent
 from models.agent_result import AgentResult
 
-from config.rss_feeds import RSS_FEEDS
+from config.rss_feeds import RSS_FEEDS, CATEGORY_ARTICLE_CAP
 
 from services.rss_service import RSSService
 from services.news_storage_service import NewsStorageService
@@ -25,27 +25,53 @@ class NewsAgent(BaseAgent):
 
             classifier = ClassifierService()
 
-
             for category, feeds in RSS_FEEDS.items():
+                category_articles = 0
 
-                for feed in feeds:
+                for feed_data in feeds:
+                    if isinstance(feed_data, tuple):
+                        feed, priority = feed_data
+                    else:
+                        feed = feed_data
+                        priority = 1
 
+                    if category_articles >= CATEGORY_ARTICLE_CAP:
+                        break
 
-                    results = RSSService.get_feed(feed)
+                    try:
+                        try:
+                            results = RSSService.get_feed(feed, item_limit=max(priority, 1) * 5)
+                        except TypeError:
+                            results = RSSService.get_feed(feed)
 
+                        for item in results:
+                            if category_articles >= CATEGORY_ARTICLE_CAP:
+                                break
 
-                    for item in results:
+                            item["source_category"] = category
+                            item = classifier.classify(item)
+                            articles.append(item)
+                            category_articles += 1
 
-                        item["source_category"] = category
+                    except Exception as feed_error:
 
-
-                        item = classifier.classify(
-                            item
+                        logger.warning(
+                            "Feed %s failed: %s",
+                            feed,
+                            str(feed_error)
                         )
 
+                        continue
 
-                        articles.append(item)
+                    except Exception as feed_error:
 
+                        logger.warning(
+                            "Feed %s failed: %s",
+                            feed,
+                            str(feed_error)
+                        )
+
+                        continue
 
 
             logger.info(

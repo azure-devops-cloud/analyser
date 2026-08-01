@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from services.database_service import DatabaseService
 from services.hash_service import generate_hash
@@ -114,7 +114,7 @@ class NewsStorageService:
                         "impact",
                         "LOW"
                     ),
-                    datetime.utcnow().isoformat()
+                    datetime.now(timezone.utc).isoformat()
                 )
             )
 

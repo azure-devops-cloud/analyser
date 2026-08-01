@@ -1,3 +1,7 @@
+import argparse
+import os
+import sys
+
 from services.database_service import DatabaseService
 from services.telegram_service import send_message
 from services.logger import get_logger
@@ -8,7 +12,70 @@ from agents.manager_agent import ManagerAgent
 logger = get_logger()
 
 
-def main():
+def build_report(results, table_count):
+    message = [
+        "🚀 MarketMind AI",
+        "",
+        "📊 Executive Brief",
+        ""
+    ]
+
+    summary_result = None
+
+    for result in results:
+        if result.agent == "summary_agent" and result.status == "success":
+            summary_result = result
+            break
+
+    if summary_result:
+        message.append(summary_result.data.get("headline", "Executive view unavailable."))
+        message.append("")
+        message.append(summary_result.data.get("summary", "Summary unavailable."))
+    else:
+        top_market = None
+        top_news = None
+
+        for result in results:
+            if result.status != "success":
+                continue
+
+            if result.agent == "market_agent" and result.data:
+                top_market = result.data[0]
+
+            if result.agent == "news_agent" and result.data:
+                top_news = result.data["analysis"]
+
+        if top_market:
+            message.append(
+                f"Lead: {top_market.get('name', 'N/A')} | Trend: {top_market.get('trend', 'N/A')} | Signal: {top_market.get('signal', 'N/A')}"
+            )
+        else:
+            message.append("Lead: N/A | Trend: N/A | Signal: N/A")
+
+        if top_news:
+            message.append(
+                f"News flow: {top_news.get('categories', {})} | Impact: {top_news.get('impact', {})}"
+            )
+
+    message.append("")
+    message.extend([
+        "💾 Database",
+        f"Tables : {table_count}",
+        "",
+        "Status : Healthy ✅"
+    ])
+
+    return "\n".join(message)
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description="MarketMind AI")
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Generate the report without sending it to Telegram"
+    )
+    args = parser.parse_args(argv)
 
     logger.info("Starting MarketMind AI")
 
@@ -21,160 +88,35 @@ def main():
     manager = ManagerAgent()
     results, context = manager.run()
 
-    message = [
-        "🚀 MarketMind AI",
-        "",
-        "📊 Intelligence Report",
-        ""
-    ]
+    report = build_report(results, len(tables))
 
-    for result in results:
+    if args.dry_run:
+        print(report)
+        db.close()
+        logger.info("MarketMind AI completed in dry-run mode")
+        return 0
 
-        if result.status != "success":
-            message.append(f"❌ {result.agent} failed")
-            message.append("")
-            continue
+    token = os.getenv("TELEGRAM_BOT_TOKEN", "")
+    chat_id = os.getenv("TELEGRAM_CHAT_ID", "")
 
-        # -----------------------------
-        # News Agent
-        # -----------------------------
-        if result.agent == "news_agent":
+    if not token or not chat_id:
+        db.close()
+        logger.error(
+            "Live Telegram delivery requires TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID"
+        )
+        print(
+            "Live Telegram delivery requires TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID",
+            file=sys.stderr,
+        )
+        return 1
 
-            checked = result.data["total_checked"]
-            analysis = result.data["analysis"]
-
-            message.append("📰 News Intelligence")
-            message.append(f"Checked : {checked}")
-            message.append(f"New : {result.count}")
-            message.append("")
-
-            message.append("📂 Categories")
-
-            for category, count in analysis["categories"].items():
-                message.append(f"• {category}: {count}")
-
-            message.append("")
-            message.append("🔥 Impact")
-
-            for impact, count in analysis["impact"].items():
-                message.append(f"• {impact}: {count}")
-
-            message.append("")
-
-        # -----------------------------
-        # Market Agent
-        # -----------------------------
-        elif result.agent == "market_agent":
-
-            message.append("📈 Market Data")
-            message.append("")
-
-            for item in result.data:
-
-                change = item.get("daily_change", 0)
-
-                icon = "🟢" if change >= 0 else "🔴"
-
-                message.append(f"{icon} {item['name']}")
-                message.append(f"Price : {item['price']}")
-                message.append(f"Daily : {change}%")
-                message.append(f"Trend : {item['trend']}")
-                message.append(f"Signal : {item['signal']}")
-                message.append(f"RSI : {item['rsi']}")
-                message.append("")
-
-        # -----------------------------
-        # Calendar Agent
-        # -----------------------------
-        elif result.agent == "calendar_agent":
-
-            message.append("📅 Economic Calendar")
-            message.append("")
-
-            if result.count == 0:
-
-                message.append("No major events found.")
-                message.append("")
-
-            else:
-
-                for event in result.data[:5]:
-
-                    message.append(f"• {event['title']}")
-
-                message.append("")
-
-        # -----------------------------
-        # Decision Agent
-        # -----------------------------
-        elif result.agent == "decision_agent":
-
-            message.append("🧠 AI Market Decisions")
-            message.append("")
-
-            for item in result.data:
-
-                if item["bias"] == "BULLISH":
-                    icon = "🟢"
-                elif item["bias"] == "BEARISH":
-                    icon = "🔴"
-                else:
-                    icon = "🟡"
-
-                message.append(f"{icon} {item['name']}")
-                message.append(f"Bias : {item['bias']}")
-                message.append(f"Score : {item['score']}/100")
-                message.append(f"Confidence : {item['confidence']}")
-                message.append("Reasons:")
-
-                for reason in item["reasons"]:
-                    message.append(f"• {reason}")
-
-                message.append("")
-
-        elif result.agent=="news_sentiment_agent":
-
-            message.append("😊 AI News Sentiment")
-        
-            message.append("")
-        
-            message.append(
-        
-                f"🟢 Positive : {result.data['positive']}"
-        
-            )
-        
-            message.append(
-        
-                f"🔴 Negative : {result.data['negative']}"
-        
-            )
-        
-            message.append(
-        
-                f"🟡 Neutral : {result.data['neutral']}"
-        
-            )
-
-    message.append("")
-    # -----------------------------
-    # Database
-    # -----------------------------
-    message.extend([
-        "💾 Database",
-        f"Tables : {len(tables)}",
-        "",
-        "Status : Healthy ✅"
-    ])
-
-    telegram_message = "\n".join(message)
-
-    send_message(telegram_message)
+    send_message(report)
 
     db.close()
 
     logger.info("MarketMind AI completed")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

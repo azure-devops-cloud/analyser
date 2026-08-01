@@ -2,6 +2,8 @@ name: MarketMind AI
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '0 18 * * *'
 
 jobs:
   marketmind:
@@ -26,7 +28,17 @@ jobs:
       - name: Install dependencies
         run: |
           pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r requirements.txt pytest
+
+
+      - name: Run tests
+        run: python -m pytest -q
+
+
+      - name: Dry run report generation
+        run: python -m main --dry-run
+        env:
+          PYTHONPATH: .
 
 
       - name: Run MarketMind AI
