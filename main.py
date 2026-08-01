@@ -26,7 +26,7 @@ def main():
     # Run Agents
     manager = ManagerAgent()
 
-    results = manager.run()
+    results, context = manager.run()
 
 
 
