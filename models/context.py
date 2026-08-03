@@ -22,6 +22,8 @@ class AgentContext:
 
         self.history = {}
 
+        self.execution = {}
+
     def add_news(self, news):
 
         self.news = news
@@ -61,3 +63,7 @@ class AgentContext:
     def add_history(self, history):
 
         self.history = history
+
+    def add_execution(self, execution):
+
+        self.execution = execution

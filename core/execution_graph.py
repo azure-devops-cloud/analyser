@@ -24,6 +24,11 @@ class ExecutionGraph:
     def mark_success(self, name: str) -> None:
         self._find(name).status = "success"
 
+    def mark_running(self, name: str) -> None:
+        node = self._find(name)
+        node.status = "running"
+        node.attempts += 1
+
     def mark_failed(self, name: str, error: Optional[str] = None) -> None:
         node = self._find(name)
         node.status = "failed"
