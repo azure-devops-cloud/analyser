@@ -93,7 +93,7 @@ def test_manager_agent_run_smoke_pipeline(tmp_path, monkeypatch):
     manager = ManagerAgent()
     results, context = manager.run()
 
-    assert len(results) == 12
+    assert len(results) == 15
     assert all(result.status == "success" for result in results)
     assert context.market
     assert context.news

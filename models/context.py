@@ -24,6 +24,12 @@ class AgentContext:
 
         self.execution = {}
 
+        self.technical_analysis = []
+
+        self.confidence = {}
+
+        self.risk = {}
+
     def add_news(self, news):
 
         self.news = news
@@ -67,3 +73,15 @@ class AgentContext:
     def add_execution(self, execution):
 
         self.execution = execution
+
+    def add_technical_analysis(self, analysis):
+
+        self.technical_analysis = analysis
+
+    def add_confidence(self, confidence):
+
+        self.confidence = confidence
+
+    def add_risk(self, risk):
+
+        self.risk = risk

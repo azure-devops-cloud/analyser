@@ -12,6 +12,8 @@ class SummaryAgent(BaseAgent):
             sentiment = context.news_sentiment or {}
             fact_validation = context.fact_validation or {}
             alerts = context.alerts or []
+            confidence = context.confidence or {}
+            risk = context.risk or {}
 
             positive = sentiment.get("positive", 0)
             negative = sentiment.get("negative", 0)
@@ -94,6 +96,10 @@ class SummaryAgent(BaseAgent):
                     f" Confidence is limited because only {fact_validation.get('evidence_count', 0)} cross-source signals were confirmed."
                 )
 
+            if risk:
+                risk_caveat = f"{risk.get('level', 'unknown').capitalize()} risk: {risk.get('reasons', ['No risk detail'])[0]}"
+                risk_watch = risk_caveat
+
             if alerts:
                 summary += f" Active alert: {alerts[0]['message']}"
 
@@ -116,6 +122,8 @@ class SummaryAgent(BaseAgent):
                     "market_signal": market_signal,
                     "fact_validation": fact_validation,
                     "alerts": alerts,
+                    "confidence": confidence,
+                    "risk": risk,
                 },
                 count=1
             )

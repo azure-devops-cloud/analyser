@@ -11,6 +11,9 @@ from agents.news_sentiment_agent import NewsSentimentAgent
 from agents.fact_validation_agent import FactValidationAgent
 from agents.monitoring_agent import MonitoringAgent
 from agents.summary_agent import SummaryAgent
+from agents.technical_analysis_agent import TechnicalAnalysisAgent
+from agents.confidence_agent import ConfidenceAgent
+from agents.risk_agent import RiskAgent
 from core.execution_graph import ExecutionGraph
 from models.domain import AgentStatus, ExecutionMetric
 from services.logger import get_logger
@@ -31,7 +34,10 @@ class ManagerAgent:
             RankingAgent(),
             MarketAgent(),
             CalendarAgent(),
+            TechnicalAnalysisAgent(),
             DecisionAgent(),
+            ConfidenceAgent(),
+            RiskAgent(),
             AlertAgent(),
             HistoryAgent(),
             MonitoringAgent(),
