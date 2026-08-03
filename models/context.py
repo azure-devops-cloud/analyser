@@ -18,6 +18,10 @@ class AgentContext:
 
         self.source_trust_map = {}
 
+        self.alerts = []
+
+        self.history = {}
+
     def add_news(self, news):
 
         self.news = news
@@ -49,3 +53,11 @@ class AgentContext:
     def add_source_trust_map(self, data):
 
         self.source_trust_map = data
+
+    def add_alerts(self, alerts):
+
+        self.alerts = alerts
+
+    def add_history(self, history):
+
+        self.history = history

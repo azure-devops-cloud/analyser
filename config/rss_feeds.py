@@ -2,12 +2,15 @@ RSS_FEEDS = {
     "fed": [
         ("https://www.federalreserve.gov/feeds/press_all.xml", 5),
         ("https://www.imf.org/external/rss/press.aspx", 3),
-        ("https://www.ecb.europa.eu/rss/press.html", 3)
+        ("https://www.ecb.europa.eu/rss/press.html", 3),
+        ("https://rbi.org.in/pressreleases_rss.xml", 5),
+        ("https://www.bls.gov/feed/bls_latest.rss", 5)
     ],
     "markets": [
         ("https://feeds.finance.yahoo.com/rss/2.0/headline", 5),
         ("https://www.reutersagency.com/feed/?best-topics=business-finance&post_type=best", 4),
-        ("https://www.bloomberg.com/feeds/bbiz/sitemap_news.xml", 3)
+        ("https://www.bloomberg.com/feeds/bbiz/sitemap_news.xml", 3),
+        ("https://www.sec.gov/news/pressreleases.rss", 5)
     ],
     "crypto": [
         ("https://cointelegraph.com/rss", 5),

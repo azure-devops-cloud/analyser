@@ -11,6 +11,7 @@ class SummaryAgent(BaseAgent):
             decisions = context.decisions or []
             sentiment = context.news_sentiment or {}
             fact_validation = context.fact_validation or {}
+            alerts = context.alerts or []
 
             positive = sentiment.get("positive", 0)
             negative = sentiment.get("negative", 0)
@@ -20,7 +21,7 @@ class SummaryAgent(BaseAgent):
 
             top_story = None
             if news_items:
-                top_story = max(news_items, key=lambda item: item.get("sentiment_score", 0))
+                top_story = max(news_items, key=lambda item: item.get("importance_score", 0))
 
             market_signal = None
             if market_items:
@@ -93,6 +94,9 @@ class SummaryAgent(BaseAgent):
                     f" Confidence is limited because only {fact_validation.get('evidence_count', 0)} cross-source signals were confirmed."
                 )
 
+            if alerts:
+                summary += f" Active alert: {alerts[0]['message']}"
+
             return AgentResult(
                 agent="summary_agent",
                 status="success",
@@ -111,6 +115,7 @@ class SummaryAgent(BaseAgent):
                     "top_decision": top_decision,
                     "market_signal": market_signal,
                     "fact_validation": fact_validation,
+                    "alerts": alerts,
                 },
                 count=1
             )

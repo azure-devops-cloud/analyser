@@ -1,5 +1,10 @@
 import feedparser
+import requests
 from datetime import datetime
+from services.logger import get_logger
+
+
+logger = get_logger(__name__)
 
 
 class CalendarService:
@@ -29,7 +34,13 @@ class CalendarService:
 
             try:
 
-                rss = feedparser.parse(feed)
+                response = requests.get(
+                    feed,
+                    timeout=20,
+                    headers={"User-Agent": "MarketMind-AI/0.2"},
+                )
+                response.raise_for_status()
+                rss = feedparser.parse(response.content)
 
                 for entry in rss.entries:
 
@@ -55,7 +66,7 @@ class CalendarService:
                         }
                     )
 
-            except Exception:
-                pass
+            except Exception as ex:
+                logger.warning("Calendar feed %s failed: %s", feed, ex)
 
         return events

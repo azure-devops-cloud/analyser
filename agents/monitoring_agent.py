@@ -13,7 +13,9 @@ class MonitoringAgent(BaseAgent):
                     "news_count": len(context.news or []),
                     "market_count": len(context.market or []),
                     "decision_count": len(context.decisions or []),
-                    "health": "healthy",
+                    "alert_count": len(context.alerts or []),
+                    "health": "degraded" if context.errors else "healthy",
+                    "errors": context.errors,
                     "sentiment": context.news_sentiment or {},
                 },
                 count=1

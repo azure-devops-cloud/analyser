@@ -48,6 +48,10 @@ class MarketService:
                 if indicators is None:
                     continue
 
+                if len(data) < 2:
+                    logger.warning("%s: Insufficient history", name)
+                    continue
+
                 latest = data.iloc[-1]
                 previous = data.iloc[-2]
 

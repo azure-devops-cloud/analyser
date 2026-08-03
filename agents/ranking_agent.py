@@ -11,7 +11,7 @@ class RankingAgent(BaseAgent):
         impact_score = int(article.get("impact_score", 0))
         source_priority = int(article.get("source_priority", 1))
         confidence = int(article.get("confidence_score", 0))
-        source_key = str(article.get("link") or article.get("url") or article.get("source") or article.get("title") or "")
+        source_key = str(article.get("source") or article.get("link") or article.get("url") or "")
         trust_score = int(trust_map.get(source_key, 60)) if trust_map else 60
 
         base_score = (sentiment_score * 12) + impact_score + (source_priority * 5) + confidence + trust_score

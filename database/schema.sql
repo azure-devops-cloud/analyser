@@ -62,6 +62,35 @@ CREATE TABLE IF NOT EXISTS alerts (
 
     message TEXT,
 
+    fingerprint TEXT UNIQUE,
+
     sent INTEGER DEFAULT 0
 
 );
+
+CREATE TABLE IF NOT EXISTS market_history (
+
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+    captured_at TEXT NOT NULL,
+
+    name TEXT NOT NULL,
+
+    symbol TEXT NOT NULL,
+
+    price REAL NOT NULL,
+
+    daily_change REAL,
+
+    trend TEXT,
+
+    signal TEXT,
+
+    rsi REAL,
+
+    volatility REAL
+
+);
+
+CREATE INDEX IF NOT EXISTS idx_market_history_symbol_captured_at
+ON market_history (symbol, captured_at DESC);

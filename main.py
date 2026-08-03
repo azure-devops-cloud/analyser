@@ -1,4 +1,5 @@
 import argparse
+import json
 import os
 import sys
 import time
@@ -41,6 +42,9 @@ def build_report(results, table_count):
         message.append(f"Lead: {lead} | Posture: {posture}")
         message.append(f"Risk: {risk}")
         message.append(f"Action: {action}")
+        alerts = data.get("alerts", [])
+        if alerts:
+            message.append(f"Alert: {alerts[0].get('message', 'Actionable alert available.')}")
     else:
         top_market = None
 
@@ -78,12 +82,51 @@ def build_report(results, table_count):
     return "\n".join(message)
 
 
+def build_report_payload(results, table_count):
+    """Return a machine-readable view of the completed workflow."""
+    summary = next(
+        (
+            result.data
+            for result in results
+            if result.agent == "summary_agent" and result.status == "success"
+        ),
+        {},
+    )
+    agent_status = {
+        result.agent: {
+            "status": result.status,
+            "count": result.count,
+            "errors": result.errors,
+        }
+        for result in results
+    }
+    failed_agents = [
+        name for name, result in agent_status.items()
+        if result["status"] != "success"
+    ]
+
+    return {
+        "application": "MarketMind AI",
+        "workflow_health": "healthy" if not failed_agents else "degraded",
+        "failed_agents": failed_agents,
+        "database": {"table_count": table_count},
+        "executive_brief": summary,
+        "agents": agent_status,
+    }
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description="MarketMind AI")
     parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Generate the report without sending it to Telegram"
+    )
+    parser.add_argument(
+        "--format",
+        choices=("text", "json"),
+        default="text",
+        help="Report format for --dry-run output",
     )
     parser.add_argument(
         "--loop",
@@ -110,6 +153,9 @@ def main(argv=None):
     if args.loop and args.interval < 0:
         parser.error("--interval must be zero or greater")
 
+    if args.format == "json" and not args.dry_run:
+        parser.error("--format json is available only with --dry-run")
+
     logger.info("Starting MarketMind AI")
 
     # Initialize Database
@@ -123,7 +169,12 @@ def main(argv=None):
         for run_index in range(loop_runs):
             manager = ManagerAgent()
             results, context = manager.run()
-            report = build_report(results, len(tables))
+            text_report = build_report(results, len(tables))
+            report = (
+                json.dumps(build_report_payload(results, len(tables)), indent=2)
+                if args.format == "json"
+                else text_report
+            )
 
             if args.dry_run:
                 print(report)
@@ -142,12 +193,17 @@ def main(argv=None):
                     return 1
 
                 confidence = None
+                actionable_alerts = []
                 for result in results:
                     if result.agent == "summary_agent" and result.status == "success":
                         confidence = result.data.get("fact_validation", {}).get("confidence_score")
-                        break
+                    if result.agent == "alert_agent" and result.status == "success":
+                        actionable_alerts = result.data.get("alerts", [])
 
-                send_message(report, confidence_score=confidence, threshold=80)
+                delivery_confidence = None if actionable_alerts else confidence
+                if not send_message(text_report, confidence_score=delivery_confidence, threshold=80):
+                    logger.error("Telegram report delivery failed or was skipped")
+                    return 1
 
             if args.loop and run_index < loop_runs - 1 and args.interval > 0:
                 time.sleep(args.interval)

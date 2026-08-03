@@ -91,6 +91,15 @@ class DatabaseService:
                 """
             )
 
+        cursor.execute("PRAGMA table_info(alerts)")
+        alert_columns = [row[1] for row in cursor.fetchall()]
+        if "fingerprint" not in alert_columns:
+            cursor.execute("ALTER TABLE alerts ADD COLUMN fingerprint TEXT")
+            cursor.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_alerts_fingerprint "
+                "ON alerts (fingerprint)"
+            )
+
 
     def health_check(self):
 

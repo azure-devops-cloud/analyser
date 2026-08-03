@@ -9,6 +9,10 @@ from models.context import AgentContext
 from services.telegram_service import send_message
 from services.database_service import DatabaseService
 from services.market_data_service import MarketService
+from services.news_storage_service import NewsStorageService
+from services.alert_service import AlertService
+from services.market_history_service import MarketHistoryService
+from services.news_history_service import NewsHistoryService
 from services.telegram_service import send_message
 
 
@@ -89,7 +93,7 @@ def test_manager_agent_run_smoke_pipeline(tmp_path, monkeypatch):
     manager = ManagerAgent()
     results, context = manager.run()
 
-    assert len(results) == 10
+    assert len(results) == 12
     assert all(result.status == "success" for result in results)
     assert context.market
     assert context.news
@@ -341,6 +345,49 @@ def test_main_supports_bounded_loop_mode(monkeypatch, capsys):
     assert captured.out.count("Loop run") == 2
 
 
+def test_main_supports_json_dry_run(monkeypatch, capsys):
+    class FakeResult:
+        def __init__(self, agent, status, data=None, count=0, errors=None):
+            self.agent = agent
+            self.status = status
+            self.data = data or {}
+            self.count = count
+            self.errors = errors or []
+
+    monkeypatch.setattr(
+        "main.DatabaseService",
+        lambda: type(
+            "FakeDB",
+            (),
+            {
+                "initialize": lambda self: None,
+                "health_check": lambda self: [("news",), ("market_snapshot",)],
+                "close": lambda self: None,
+            },
+        )(),
+    )
+    monkeypatch.setattr(
+        "main.ManagerAgent",
+        lambda: type(
+            "FakeManager",
+            (),
+            {
+                "run": lambda self: (
+                    [FakeResult("market_agent", "failed", errors=["provider unavailable"])],
+                    {},
+                )
+            },
+        )(),
+    )
+
+    assert main.main(["--dry-run", "--format", "json"]) == 0
+    payload = __import__("json").loads(capsys.readouterr().out)
+
+    assert payload["workflow_health"] == "degraded"
+    assert payload["failed_agents"] == ["market_agent"]
+    assert payload["agents"]["market_agent"]["errors"] == ["provider unavailable"]
+
+
 def test_deduplication_and_ranking_use_source_priority_for_accuracy():
     context = AgentContext()
     context.news = [
@@ -479,6 +526,92 @@ def test_ranking_agent_uses_persistent_source_trust_map():
 
     assert result.status == "success"
     assert result.data["top_story"]["link"] == "https://example.com/credible"
+
+
+def test_fact_validation_uses_distinct_sources_before_deduplication():
+    context = AgentContext()
+    context.news = [
+        {
+            "title": "Fed rate cut boosts growth outlook",
+            "source": "https://source-one.example/feed.xml",
+        },
+        {
+            "title": "Fed rate cut boosts growth outlook",
+            "source": "https://source-two.example/feed.xml",
+        },
+    ]
+
+    result = FactValidationAgent().run(context)
+
+    assert result.status == "success"
+    assert result.data["verification_status"] == "validated"
+    assert result.data["evidence_count"] == 2
+    assert result.data["confidence_score"] == 70
+
+
+def test_news_storage_ignores_revised_title_at_existing_url(tmp_path, monkeypatch):
+    db_path = tmp_path / "marketmind.db"
+    monkeypatch.setattr("services.database_service.DATABASE_PATH", db_path)
+    storage = NewsStorageService()
+
+    first = storage.save_news([
+        {"title": "Original headline", "link": "https://example.com/story"}
+    ])
+    revised = storage.save_news([
+        {"title": "Revised headline", "link": "https://example.com/story"}
+    ])
+
+    storage.close()
+
+    assert len(first) == 1
+    assert revised == []
+
+
+def test_alerts_are_actionable_and_deduplicated_per_day(tmp_path, monkeypatch):
+    monkeypatch.setattr("services.database_service.DATABASE_PATH", tmp_path / "marketmind.db")
+    service = AlertService()
+    decisions = [{"name": "BITCOIN", "bias": "BULLISH", "score": 82, "trend": "BULLISH", "rsi": 60}]
+
+    created = service.create_actionable_alerts(decisions)
+    duplicate = service.create_actionable_alerts(decisions)
+    service.close()
+
+    assert created[0]["category"] == "BUY_WATCH"
+    assert duplicate == []
+
+
+def test_market_history_calculates_snapshot_change(tmp_path, monkeypatch):
+    monkeypatch.setattr("services.database_service.DATABASE_PATH", tmp_path / "marketmind.db")
+    service = MarketHistoryService()
+    first = service.record([{"name": "BITCOIN", "symbol": "BTC-USD", "price": 100, "daily_change": 1}])
+    second = service.record([{"name": "BITCOIN", "symbol": "BTC-USD", "price": 110, "daily_change": 2}])
+    recent = service.recent()
+    service.close()
+
+    assert first[0]["snapshot_change_pct"] is None
+    assert second[0]["snapshot_change_pct"] == 10.0
+    assert len(recent) == 2
+
+
+def test_news_history_reports_persisted_articles(tmp_path, monkeypatch):
+    monkeypatch.setattr("services.database_service.DATABASE_PATH", tmp_path / "marketmind.db")
+    storage = NewsStorageService()
+    storage.save_news([
+        {
+            "title": "Inflation data update",
+            "link": "https://example.com/inflation",
+            "category": "FED",
+            "source": "https://example.com/feed",
+        }
+    ])
+    storage.close()
+    history = NewsHistoryService()
+    summary = history.summary()
+    history.close()
+
+    assert summary["total_articles"] == 1
+    assert summary["articles_last_24h"] == 1
+    assert summary["categories_last_24h"] == {"FED": 1}
 
 
 def test_main_requires_telegram_credentials_for_live_run(monkeypatch, capsys):

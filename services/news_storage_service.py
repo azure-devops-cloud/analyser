@@ -56,26 +56,7 @@ class NewsStorageService:
 
             cursor.execute(
                 """
-                SELECT id
-                FROM news
-                WHERE hash = ?
-                """,
-                (news_hash,)
-            )
-
-
-            exists = cursor.fetchone()
-
-
-            if exists:
-
-                continue
-
-
-
-            cursor.execute(
-                """
-                INSERT INTO news
+                INSERT OR IGNORE INTO news
                 (
                     title,
                     url,
@@ -92,7 +73,7 @@ class NewsStorageService:
                 """,
                 (
                     title,
-                    link,
+                    link or None,
                     article.get(
                         "source",
                         ""
@@ -119,9 +100,8 @@ class NewsStorageService:
             )
 
 
-            new_articles.append(
-                article
-            )
+            if cursor.rowcount:
+                new_articles.append(article)
 
 
 

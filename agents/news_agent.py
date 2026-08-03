@@ -50,6 +50,7 @@ class NewsAgent(BaseAgent):
 
                             item["source_category"] = category
                             item["source_priority"] = priority
+                            item["source"] = item.get("source") or feed
                             item = classifier.classify(item)
                             articles.append(item)
                             category_articles += 1
@@ -63,17 +64,6 @@ class NewsAgent(BaseAgent):
                         )
 
                         continue
-
-                    except Exception as feed_error:
-
-                        logger.warning(
-                            "Feed %s failed: %s",
-                            feed,
-                            str(feed_error)
-                        )
-
-                        continue
-
 
             logger.info(
                 f"RSS Articles Checked: {len(articles)}"
