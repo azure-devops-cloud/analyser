@@ -14,6 +14,10 @@ class AgentContext:
         
         self.news_sentiment={}
 
+        self.fact_validation = {}
+
+        self.source_trust_map = {}
+
     def add_news(self, news):
 
         self.news = news
@@ -37,3 +41,11 @@ class AgentContext:
     def add_news_sentiment(self,data):
 
         self.news_sentiment=data
+
+    def add_fact_validation(self, data):
+
+        self.fact_validation = data
+
+    def add_source_trust_map(self, data):
+
+        self.source_trust_map = data

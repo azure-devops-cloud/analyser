@@ -1,0 +1,23 @@
+{
+  "https://www.federalreserve.gov/feeds/press_all.xml": 95,
+  "https://www.imf.org/external/rss/press.aspx": 88,
+  "https://www.ecb.europa.eu/rss/press.html": 88,
+  "https://feeds.finance.yahoo.com/rss/2.0/headline": 82,
+  "https://www.reutersagency.com/feed/?best-topics=business-finance&post_type=best": 94,
+  "https://www.bloomberg.com/feeds/bbiz/sitemap_news.xml": 92,
+  "https://cointelegraph.com/rss": 84,
+  "https://www.coindesk.com/arc/outboundfeeds/rss/": 86,
+  "https://cryptopotato.com/feed/": 72,
+  "https://www.microsoft.com/en-us/research/blog/feed/": 90,
+  "https://blogs.nvidia.com/feed/": 89,
+  "https://blog.google/rss/": 88,
+  "https://aws.amazon.com/about-aws/whats-new/recent/feed/": 90,
+  "https://azure.microsoft.com/en-us/blog/feed/": 88,
+  "https://cloud.google.com/blog/rss": 87,
+  "https://www.cisa.gov/uscert/ncas/alerts.xml": 96,
+  "https://nvd.nist.gov/feeds/xml/cve/misc/nvd-rss.xml": 95,
+  "https://www.bleepingcomputer.com/feed/": 78,
+  "https://github.blog/feed/": 89,
+  "https://www.linuxfoundation.org/feed/": 84,
+  "https://www.kubernetes.io/feed.xml": 84
+}

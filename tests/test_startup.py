@@ -2,7 +2,11 @@ import main
 from agents.manager_agent import ManagerAgent
 from agents.news_agent import NewsAgent
 from agents.summary_agent import SummaryAgent
+from agents.deduplication_agent import DeduplicationAgent
+from agents.ranking_agent import RankingAgent
+from agents.fact_validation_agent import FactValidationAgent
 from models.context import AgentContext
+from services.telegram_service import send_message
 from services.database_service import DatabaseService
 from services.market_data_service import MarketService
 from services.telegram_service import send_message
@@ -280,6 +284,201 @@ def test_main_supports_dry_run(monkeypatch, capsys):
     assert "MarketMind AI" in captured.out
     assert "Executive Brief" in captured.out
     assert "Tables : 3" in captured.out
+
+
+def test_main_supports_bounded_loop_mode(monkeypatch, capsys):
+    class FakeResult:
+        def __init__(self, agent, status, data=None, count=0):
+            self.agent = agent
+            self.status = status
+            self.data = data or {}
+            self.count = count
+
+    class FakeManager:
+        def __init__(self):
+            self.run_count = 0
+
+        def run(self):
+            self.run_count += 1
+            return (
+                [
+                    FakeResult(
+                        "summary_agent",
+                        "success",
+                        {
+                            "headline": "Loop run",
+                            "action_recommendation": "Action",
+                            "risk_watch": "Risk",
+                            "top_opportunity": "BITCOIN",
+                            "market_posture": "Bullish",
+                        },
+                        1,
+                    )
+                ],
+                {},
+            )
+
+    monkeypatch.setattr(
+        "main.DatabaseService",
+        lambda: type(
+            "FakeDB",
+            (),
+            {
+                "initialize": lambda self: None,
+                "health_check": lambda self: [("news",), ("market_snapshot",), ("alerts",)],
+                "close": lambda self: None,
+            }
+        )()
+    )
+
+    monkeypatch.setattr("main.ManagerAgent", FakeManager)
+
+    exit_code = main.main(["--dry-run", "--loop", "--max-runs", "2", "--interval", "0"])
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    assert "Loop run" in captured.out
+    assert captured.out.count("Loop run") == 2
+
+
+def test_deduplication_and_ranking_use_source_priority_for_accuracy():
+    context = AgentContext()
+    context.news = [
+        {
+            "title": "Fed rate cut boosts growth outlook",
+            "link": "https://example.com/a",
+            "summary": "Fed rate cut boosts growth outlook",
+            "source_priority": 1,
+            "sentiment_score": 2,
+            "impact_score": 85,
+            "impact": "HIGH",
+        },
+        {
+            "title": "Fed rate cut boosts growth outlook",
+            "link": "https://example.com/b",
+            "summary": "Fed rate cut boosts growth outlook",
+            "source_priority": 5,
+            "sentiment_score": 2,
+            "impact_score": 90,
+            "impact": "HIGH",
+        },
+        {
+            "title": "Crypto rally accelerates",
+            "link": "https://example.com/c",
+            "summary": "Crypto rally accelerates",
+            "source_priority": 2,
+            "sentiment_score": 1,
+            "impact_score": 40,
+            "impact": "MEDIUM",
+        },
+    ]
+
+    dedupe_result = DeduplicationAgent().run(context)
+    assert dedupe_result.status == "success"
+    assert dedupe_result.count == 2
+
+    ranked = RankingAgent().run(context)
+    assert ranked.status == "success"
+    assert ranked.data["top_story"]["link"] == "https://example.com/b"
+    assert ranked.data["top_score"] >= 100
+
+
+def test_summary_agent_uses_fact_validation_confidence_for_cautious_action():
+    context = AgentContext()
+    context.news = [
+        {
+            "title": "Fed rate cut boosts growth outlook",
+            "category": "FED",
+            "impact": "HIGH",
+            "sentiment": "POSITIVE",
+            "sentiment_score": 2,
+            "source_priority": 1,
+            "link": "https://example.com/one",
+        }
+    ]
+    context.market = [
+        {
+            "name": "BITCOIN",
+            "trend": "BULLISH",
+            "signal": "BUY",
+            "daily_change": 1.2,
+            "rsi": 66,
+        }
+    ]
+    context.news_sentiment = {"positive": 1, "negative": 0, "neutral": 0}
+    context.decisions = [
+        {
+            "name": "BITCOIN",
+            "bias": "BULLISH",
+            "score": 82,
+        }
+    ]
+    context.fact_validation = {
+        "confidence_score": 35,
+        "verification_status": "needs_more_sources",
+        "evidence_count": 0,
+    }
+
+    result = SummaryAgent().run(context)
+
+    assert result.status == "success"
+    assert "wait for more evidence" in result.data["action_recommendation"].lower()
+    assert "hold" in result.data["action_recommendation"].lower()
+
+
+def test_send_message_respects_confidence_threshold(monkeypatch):
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "token")
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "chat")
+
+    calls = []
+
+    def fake_post(url, json=None, timeout=30):
+        calls.append(json)
+
+        class Response:
+            status_code = 200
+            text = "ok"
+
+        return Response()
+
+    monkeypatch.setattr("services.telegram_service.requests.post", fake_post)
+
+    assert send_message("high-confidence message", confidence_score=85, threshold=80) is True
+    assert send_message("low-confidence message", confidence_score=30, threshold=80) is False
+    assert len(calls) == 1
+
+
+def test_ranking_agent_uses_persistent_source_trust_map():
+    context = AgentContext()
+    context.source_trust_map = {
+        "https://example.com/credible": 95,
+        "https://example.com/noisy": 35,
+    }
+    context.news = [
+        {
+            "title": "Fed rate cut boosts growth outlook",
+            "link": "https://example.com/noisy",
+            "summary": "Fed rate cut boosts growth outlook",
+            "source_priority": 1,
+            "sentiment_score": 2,
+            "impact_score": 85,
+            "impact": "HIGH",
+        },
+        {
+            "title": "Fed rate cut boosts growth outlook",
+            "link": "https://example.com/credible",
+            "summary": "Fed rate cut boosts growth outlook",
+            "source_priority": 3,
+            "sentiment_score": 2,
+            "impact_score": 88,
+            "impact": "HIGH",
+        },
+    ]
+
+    result = RankingAgent().run(context)
+
+    assert result.status == "success"
+    assert result.data["top_story"]["link"] == "https://example.com/credible"
 
 
 def test_main_requires_telegram_credentials_for_live_run(monkeypatch, capsys):

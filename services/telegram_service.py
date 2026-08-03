@@ -7,9 +7,17 @@ from services.logger import get_logger
 logger = get_logger(__name__)
 
 
-def send_message(message):
+def send_message(message, confidence_score=None, threshold=80):
     token = os.getenv("TELEGRAM_BOT_TOKEN", settings.TELEGRAM_BOT_TOKEN)
     chat_id = os.getenv("TELEGRAM_CHAT_ID", settings.TELEGRAM_CHAT_ID)
+
+    if confidence_score is not None and confidence_score < threshold:
+        logger.info(
+            "Telegram delivery skipped because confidence %.1f is below threshold %.1f",
+            confidence_score,
+            threshold,
+        )
+        return False
 
     if not token or not chat_id:
         logger.warning(

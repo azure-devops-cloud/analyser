@@ -10,10 +10,13 @@ class SummaryAgent(BaseAgent):
             market_items = context.market or []
             decisions = context.decisions or []
             sentiment = context.news_sentiment or {}
+            fact_validation = context.fact_validation or {}
 
             positive = sentiment.get("positive", 0)
             negative = sentiment.get("negative", 0)
             neutral = sentiment.get("neutral", 0)
+            fact_confidence = int(fact_validation.get("confidence_score", 100))
+            fact_status = fact_validation.get("verification_status", "validated")
 
             top_story = None
             if news_items:
@@ -49,7 +52,11 @@ class SummaryAgent(BaseAgent):
             else:
                 risk_caveat = "Risk remains contained, though momentum should still be monitored closely."
 
-            if market_bias == "bullish":
+            if fact_status == "needs_more_sources" or fact_confidence < 50:
+                action_recommendation = (
+                    f"Hold on {top_opportunity} and wait for more evidence before acting."
+                )
+            elif market_bias == "bullish":
                 action_recommendation = (
                     f"Maintain selective exposure in {top_opportunity} and keep watching for follow-through confirmation."
                 )
@@ -81,6 +88,11 @@ class SummaryAgent(BaseAgent):
                     f"{top_story.get('impact', 'unknown')} impact and a {top_story.get('sentiment', 'neutral').lower()} bias."
                 )
 
+            if fact_status != "validated":
+                summary += (
+                    f" Confidence is limited because only {fact_validation.get('evidence_count', 0)} cross-source signals were confirmed."
+                )
+
             return AgentResult(
                 agent="summary_agent",
                 status="success",
@@ -98,6 +110,7 @@ class SummaryAgent(BaseAgent):
                     "top_story": top_story,
                     "top_decision": top_decision,
                     "market_signal": market_signal,
+                    "fact_validation": fact_validation,
                 },
                 count=1
             )

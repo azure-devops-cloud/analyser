@@ -16,15 +16,18 @@ class FactValidationAgent(BaseAgent):
 
             evidence_count = sum(count for count in topics.values() if count > 1)
             confidence_score = min(100, max(40, evidence_count * 20))
+            result_data = {
+                "evidence_count": evidence_count,
+                "confidence_score": confidence_score,
+                "verification_status": "validated" if evidence_count > 0 else "needs_more_sources",
+            }
+
+            context.add_fact_validation(result_data)
 
             return AgentResult(
                 agent="fact_validation_agent",
                 status="success",
-                data={
-                    "evidence_count": evidence_count,
-                    "confidence_score": confidence_score,
-                    "verification_status": "validated" if evidence_count > 0 else "needs_more_sources",
-                },
+                data=result_data,
                 count=evidence_count
             )
         except Exception as ex:

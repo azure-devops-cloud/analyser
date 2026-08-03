@@ -49,6 +49,7 @@ class NewsAgent(BaseAgent):
                                 break
 
                             item["source_category"] = category
+                            item["source_priority"] = priority
                             item = classifier.classify(item)
                             articles.append(item)
                             category_articles += 1
