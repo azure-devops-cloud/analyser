@@ -1,5 +1,7 @@
 import sqlite3
+from collections.abc import Iterator
 from pathlib import Path
+from typing import Any
 
 from config.settings import DATABASE_PATH
 from services.logger import get_logger
@@ -9,18 +11,24 @@ logger = get_logger(__name__)
 
 
 class DatabaseService:
+    """Own a configured SQLite connection and apply schema migrations."""
 
-
-    def __init__(self):
-
-        self.connection = sqlite3.connect(
-            DATABASE_PATH
-        )
+    def __init__(self, database_path: Path | None = None):
+        self.database_path = database_path or DATABASE_PATH
+        self.connection = sqlite3.connect(self.database_path, timeout=5.0)
+        self.connection.row_factory = sqlite3.Row
+        self._configure_connection()
 
         self.initialize()
 
+    def _configure_connection(self) -> None:
+        """Apply settings that make short-lived concurrent runs safer."""
+        self.connection.execute("PRAGMA foreign_keys = ON")
+        self.connection.execute("PRAGMA busy_timeout = 5000")
+        self.connection.execute("PRAGMA journal_mode = WAL")
+        self.connection.execute("PRAGMA synchronous = NORMAL")
 
-    def initialize(self):
+    def initialize(self) -> None:
 
         schema_file = (
             Path(__file__).resolve()
@@ -39,6 +47,11 @@ class DatabaseService:
 
         self.run_migrations()
 
+        self.connection.execute(
+            "INSERT OR IGNORE INTO schema_migrations (version) VALUES (?)",
+            ("2026-08-phase-1",),
+        )
+
 
         self.connection.commit()
 
@@ -48,7 +61,7 @@ class DatabaseService:
         )
 
 
-    def run_migrations(self):
+    def run_migrations(self) -> None:
 
         cursor = self.connection.cursor()
 
@@ -101,7 +114,7 @@ class DatabaseService:
             )
 
 
-    def health_check(self):
+    def health_check(self) -> list[sqlite3.Row]:
 
         cursor = self.connection.cursor()
 
@@ -119,6 +132,6 @@ class DatabaseService:
 
 
 
-    def close(self):
+    def close(self) -> None:
 
         self.connection.close()

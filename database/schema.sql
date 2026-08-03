@@ -94,3 +94,36 @@ CREATE TABLE IF NOT EXISTS market_history (
 
 CREATE INDEX IF NOT EXISTS idx_market_history_symbol_captured_at
 ON market_history (symbol, captured_at DESC);
+
+CREATE TABLE IF NOT EXISTS schema_migrations (
+
+    version TEXT PRIMARY KEY,
+
+    applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+
+);
+
+CREATE TABLE IF NOT EXISTS execution_metrics (
+
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+    run_id TEXT NOT NULL,
+
+    agent TEXT NOT NULL,
+
+    status TEXT NOT NULL,
+
+    started_at TEXT NOT NULL,
+
+    duration_ms REAL NOT NULL,
+
+    item_count INTEGER NOT NULL DEFAULT 0,
+
+    error_count INTEGER NOT NULL DEFAULT 0,
+
+    metadata TEXT NOT NULL DEFAULT '{}'
+
+);
+
+CREATE INDEX IF NOT EXISTS idx_execution_metrics_run_id
+ON execution_metrics (run_id);
