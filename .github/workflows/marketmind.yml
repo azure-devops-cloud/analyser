@@ -2,10 +2,12 @@ name: MarketMind AI
 
 on:
   workflow_dispatch:
+
   schedule:
     - cron: '0 18 * * *'
 
 jobs:
+
   marketmind:
 
     runs-on: ubuntu-latest
@@ -18,45 +20,43 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-
       - name: Install dependencies
         run: |
-          pip install --upgrade pip
-          pip install -r requirements.txt pytest
-
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest
 
       - name: Run tests
         run: python -m pytest -q
+        env:
+          PYTHONPATH: .
 
-
-      - name: Dry run report generation
+      - name: Dry Run
         run: python -m main --dry-run
         env:
           PYTHONPATH: .
 
-
       - name: Run MarketMind AI
-        if: ${{ secrets.TELEGRAM_BOT_TOKEN != '' && secrets.TELEGRAM_CHAT_ID != '' }}
         run: python -m main
         env:
           PYTHONPATH: .
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
 
-
-      - name: Save database changes
+      - name: Commit Database
         run: |
           git config --global user.name "marketmind-ai-bot"
           git config --global user.email "marketmind-ai-bot@users.noreply.github.com"
 
           git add data/marketmind.db
 
-          git commit -m "chore: update market database" || echo "No database changes"
+          git diff --cached --quiet && echo "No DB changes" && exit 0
+
+          git commit -m "chore: update market database"
 
           git push
