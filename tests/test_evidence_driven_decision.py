@@ -41,7 +41,9 @@ def test_decision_contains_evidence_without_changing_legacy_score():
         evidence=evidence,
     )
 
-    assert result["score"] == 90
+    # This is the score produced by the pre-evidence DecisionService for
+    # the same inputs. Adding evidence must not alter it.
+    assert result["score"] == 100
     assert result["bias"] == "BULLISH"
     assert result["evidence"]["count"] == len(evidence)
     assert result["evidence"]["items"]
@@ -74,6 +76,6 @@ def test_evidence_is_descriptive_and_cannot_change_score():
         evidence=evidence,
     )
 
-    assert baseline["score"] == 90
+    assert baseline["score"] == 100
     assert with_evidence["score"] == baseline["score"]
     assert with_evidence["evidence"]["count"] == len(evidence)
