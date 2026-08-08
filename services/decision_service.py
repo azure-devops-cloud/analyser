@@ -26,6 +26,7 @@ class DecisionService:
         else:
             reasons.append("RSI is neutral")
 
+        # Preserve the pre-evidence legacy scoring contract.
         daily = market.get("daily_change", 0)
         if daily > 1:
             score += 10
