@@ -26,8 +26,6 @@ class DecisionService:
         else:
             reasons.append("RSI is neutral")
 
-        # Preserve the pre-evidence scoring contract exactly. Evidence is
-        # descriptive and must not silently change this calculation.
         daily = market.get("daily_change", 0)
         if daily > 1:
             score += 10

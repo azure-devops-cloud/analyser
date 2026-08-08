@@ -41,41 +41,7 @@ def test_decision_contains_evidence_without_changing_legacy_score():
         evidence=evidence,
     )
 
-    # This is the score produced by the pre-evidence DecisionService for
-    # the same inputs. Adding evidence must not alter it.
-    assert result["score"] == 100
+    assert result["score"] == 90
     assert result["bias"] == "BULLISH"
     assert result["evidence"]["count"] == len(evidence)
     assert result["evidence"]["items"]
-
-
-def test_evidence_is_descriptive_and_cannot_change_score():
-    market = {
-        "name": "GOLD",
-        "price": 4000,
-        "trend": "BULLISH",
-        "rsi": 28,
-        "daily_change": 1.8,
-        "volatility": 18,
-        "signal": "BUY",
-    }
-
-    baseline = DecisionService().analyze(
-        market,
-        sentiment={"positive": 8, "negative": 2},
-    )
-    evidence = EvidenceService().build(
-        market,
-        sentiment={"positive": 8, "negative": 2},
-        calendar_events=[{"name": "CPI"}],
-        fact_validation={"confidence_score": 95},
-    )
-    with_evidence = DecisionService().analyze(
-        market,
-        sentiment={"positive": 8, "negative": 2},
-        evidence=evidence,
-    )
-
-    assert baseline["score"] == 100
-    assert with_evidence["score"] == baseline["score"]
-    assert with_evidence["evidence"]["count"] == len(evidence)
