@@ -19,7 +19,9 @@ class CalendarAgent(BaseAgent):
                 "errors": result["errors"],
             })
 
-            status = "success" if result["status"] in {"available", "available_empty"} else "degraded"
+            # Provider outage is an explicit degraded condition, but not an
+            # agent crash. Use the domain's supported SKIPPED lifecycle state.
+            status = "success" if result["status"] in {"available", "available_empty"} else "skipped"
             return AgentResult(
                 agent="calendar_agent",
                 status=status,
@@ -36,6 +38,6 @@ class CalendarAgent(BaseAgent):
             })
             return AgentResult(
                 agent="calendar_agent",
-                status="degraded",
+                status="skipped",
                 errors=[str(ex)]
             )
