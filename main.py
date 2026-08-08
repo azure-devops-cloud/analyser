@@ -5,7 +5,11 @@ import sys
 import time
 
 from services.database_service import DatabaseService
-from services.telegram_service import send_message
+from services.telegram_service import (
+    TELEGRAM_FAILED,
+    TELEGRAM_SENT,
+    send_message_status,
+)
 from services.logger import get_logger
 
 from agents.manager_agent import ManagerAgent
@@ -117,52 +121,24 @@ def build_report_payload(results, table_count):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description="MarketMind AI")
-    parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Generate the report without sending it to Telegram"
-    )
-    parser.add_argument(
-        "--format",
-        choices=("text", "json"),
-        default="text",
-        help="Report format for --dry-run output",
-    )
-    parser.add_argument(
-        "--loop",
-        action="store_true",
-        help="Run the workflow repeatedly in a bounded loop"
-    )
-    parser.add_argument(
-        "--max-runs",
-        type=int,
-        default=1,
-        help="Number of loop iterations to execute when --loop is enabled"
-    )
-    parser.add_argument(
-        "--interval",
-        type=float,
-        default=60.0,
-        help="Seconds to wait between loop iterations"
-    )
+    parser.add_argument("--dry-run", action="store_true", help="Generate the report without sending it to Telegram")
+    parser.add_argument("--format", choices=("text", "json"), default="text", help="Report format for --dry-run output")
+    parser.add_argument("--loop", action="store_true", help="Run the workflow repeatedly in a bounded loop")
+    parser.add_argument("--max-runs", type=int, default=1, help="Number of loop iterations to execute when --loop is enabled")
+    parser.add_argument("--interval", type=float, default=60.0, help="Seconds to wait between loop iterations")
     args = parser.parse_args(argv)
 
     if args.loop and args.max_runs < 1:
         parser.error("--max-runs must be at least 1 when --loop is enabled")
-
     if args.loop and args.interval < 0:
         parser.error("--interval must be zero or greater")
-
     if args.format == "json" and not args.dry_run:
         parser.error("--format json is available only with --dry-run")
 
     logger.info("Starting MarketMind AI")
-
-    # Initialize Database
     db = DatabaseService()
     db.initialize()
     tables = db.health_check()
-
     loop_runs = args.max_runs if args.loop else 1
 
     try:
@@ -170,26 +146,16 @@ def main(argv=None):
             manager = ManagerAgent()
             results, context = manager.run()
             text_report = build_report(results, len(tables))
-            report = (
-                json.dumps(build_report_payload(results, len(tables)), indent=2)
-                if args.format == "json"
-                else text_report
-            )
+            report = json.dumps(build_report_payload(results, len(tables)), indent=2) if args.format == "json" else text_report
 
             if args.dry_run:
                 print(report)
             else:
                 token = os.getenv("TELEGRAM_BOT_TOKEN", "")
                 chat_id = os.getenv("TELEGRAM_CHAT_ID", "")
-
                 if not token or not chat_id:
-                    logger.error(
-                        "Live Telegram delivery requires TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID"
-                    )
-                    print(
-                        "Live Telegram delivery requires TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID",
-                        file=sys.stderr,
-                    )
+                    logger.error("Live Telegram delivery requires TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID")
+                    print("Live Telegram delivery requires TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID", file=sys.stderr)
                     return 1
 
                 confidence = None
@@ -201,9 +167,12 @@ def main(argv=None):
                         actionable_alerts = result.data.get("alerts", [])
 
                 delivery_confidence = None if actionable_alerts else confidence
-                if not send_message(text_report, confidence_score=delivery_confidence, threshold=80):
-                    logger.error("Telegram report delivery failed or was skipped")
+                status = send_message_status(text_report, confidence_score=delivery_confidence, threshold=80)
+                if status == TELEGRAM_FAILED:
+                    logger.error("Telegram report delivery failed")
                     return 1
+                if status != TELEGRAM_SENT:
+                    logger.info("Telegram report delivery skipped")
 
             if args.loop and run_index < loop_runs - 1 and args.interval > 0:
                 time.sleep(args.interval)
