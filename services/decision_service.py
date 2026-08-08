@@ -26,12 +26,14 @@ class DecisionService:
         else:
             reasons.append("RSI is neutral")
 
+        # Keep the established evidence-driven test contract at +/-5 here.
+        # Evidence is descriptive and must not silently change the score.
         daily = market.get("daily_change", 0)
         if daily > 1:
-            score += 10
+            score += 5
             reasons.append("Positive daily momentum")
         elif daily < -1:
-            score -= 10
+            score -= 5
             reasons.append("Negative daily momentum")
 
         volatility = market.get("volatility", 20)
