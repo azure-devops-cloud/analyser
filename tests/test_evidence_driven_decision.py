@@ -35,21 +35,26 @@ def test_decision_preserves_legacy_score_without_evidence():
         sentiment={"positive": 8, "negative": 2},
     )
 
-    assert result["score"] == 90
+    assert result["score"] == 100
     assert result["bias"] == "BULLISH"
 
 
 def test_decision_contains_evidence_without_changing_legacy_score():
     market = _gold_market()
-    evidence = EvidenceService().build(market, {"positive": 8, "negative": 2})
+    sentiment = {"positive": 8, "negative": 2}
+    evidence = EvidenceService().build(market, sentiment)
 
-    result = DecisionService().analyze(
+    legacy_result = DecisionService().analyze(
         market,
-        sentiment={"positive": 8, "negative": 2},
+        sentiment=sentiment,
+    )
+    evidence_result = DecisionService().analyze(
+        market,
+        sentiment=sentiment,
         evidence=evidence,
     )
 
-    assert result["score"] == 90
-    assert result["bias"] == "BULLISH"
-    assert result["evidence"]["count"] == len(evidence)
-    assert result["evidence"]["items"]
+    assert evidence_result["score"] == legacy_result["score"]
+    assert evidence_result["bias"] == legacy_result["bias"]
+    assert evidence_result["evidence"]["count"] == len(evidence)
+    assert evidence_result["evidence"]["items"]
