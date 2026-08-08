@@ -6,6 +6,7 @@ class AgentContext:
         self.market = []
         self.decisions = []
         self.calendar = []
+        self.calendar_status = {}
         self.errors = []
         self.news_sentiment = {}
         self.fact_validation = {}
@@ -29,6 +30,9 @@ class AgentContext:
 
     def add_calendar(self, calendar):
         self.calendar = calendar
+
+    def add_calendar_status(self, status):
+        self.calendar_status = status or {}
 
     def add_error(self, error):
         self.errors.append(error)
