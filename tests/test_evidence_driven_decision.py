@@ -2,15 +2,21 @@ from services.decision_service import DecisionService
 from services.evidence_service import EvidenceService
 
 
+def _gold_market():
+    return {
+        "name": "GOLD",
+        "price": 4000,
+        "trend": "BULLISH",
+        "rsi": 28,
+        "daily_change": 1.8,
+        "volatility": 18,
+        "signal": "BUY",
+    }
+
+
 def test_evidence_service_builds_auditable_market_signals():
     evidence = EvidenceService().build(
-        {
-            "name": "GOLD",
-            "trend": "BULLISH",
-            "rsi": 28,
-            "daily_change": 1.8,
-            "volatility": 18,
-        },
+        _gold_market(),
         sentiment={"positive": 8, "negative": 2},
         calendar_events=[{"name": "CPI"}],
         fact_validation={"confidence_score": 70},
@@ -23,16 +29,18 @@ def test_evidence_service_builds_auditable_market_signals():
     }
 
 
+def test_decision_preserves_legacy_score_without_evidence():
+    result = DecisionService().analyze(
+        _gold_market(),
+        sentiment={"positive": 8, "negative": 2},
+    )
+
+    assert result["score"] == 90
+    assert result["bias"] == "BULLISH"
+
+
 def test_decision_contains_evidence_without_changing_legacy_score():
-    market = {
-        "name": "GOLD",
-        "price": 4000,
-        "trend": "BULLISH",
-        "rsi": 28,
-        "daily_change": 1.8,
-        "volatility": 18,
-        "signal": "BUY",
-    }
+    market = _gold_market()
     evidence = EvidenceService().build(market, {"positive": 8, "negative": 2})
 
     result = DecisionService().analyze(
