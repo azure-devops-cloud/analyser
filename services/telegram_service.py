@@ -36,7 +36,6 @@ def send_message(message, confidence_score=None, threshold=80):
     url = f"https://api.telegram.org/bot{token}/sendMessage"
 
     try:
-
         response = requests.post(
             url,
             json={
@@ -47,17 +46,22 @@ def send_message(message, confidence_score=None, threshold=80):
             timeout=30
         )
 
-        response.raise_for_status()
+        # Use the status code as the contract so lightweight test doubles and
+        # compatible response objects do not need requests-specific helpers.
+        if response.status_code >= 400:
+            logger.error(
+                "Telegram send failed with HTTP %s: %s",
+                response.status_code,
+                getattr(response, "text", ""),
+            )
+            return False
 
         logger.info("Telegram message sent successfully")
-
         return True
 
     except requests.RequestException as ex:
-
         logger.exception(
             "Telegram send failed: %s",
             ex
         )
-
         return False
