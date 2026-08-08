@@ -32,3 +32,7 @@ jobs:
         run: python -m pytest -q
         env:
           PYTHONPATH: .
+
+      - name: Report result
+        if: always()
+        run: echo "Test workflow completed"
