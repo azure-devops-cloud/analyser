@@ -41,7 +41,6 @@ def evidence(asset="GOLD"):
 
 def test_reasoner_returns_structured_evidence_packet_without_changing_decision():
     decision = {"name": "GOLD", "bias": "BULLISH", "score": 100, "confidence": "HIGH"}
-
     result = ReasonerService().analyze(decision, evidence())
 
     assert result["asset"] == "GOLD"
@@ -56,7 +55,6 @@ def test_reasoner_returns_structured_evidence_packet_without_changing_decision()
 
 def test_reasoner_does_not_use_other_asset_evidence():
     decision = {"name": "GOLD", "bias": "BULLISH", "score": 100, "confidence": "HIGH"}
-
     result = ReasonerService().analyze(decision, evidence())
 
     assert "BITCOIN" not in result["reasoning"]
@@ -75,4 +73,30 @@ def test_reasoner_agent_exposes_packet_in_context():
     assert result.status == "success"
     assert result.data[0]["asset"] == "GOLD"
     assert result.data[0]["score"] == 100
+    assert result.data[0]["explanation"]["score"] == 100
+    assert result.data[0]["explanation"]["bias"] == "BULLISH"
+    assert result.data[0]["explanation"]["cited_evidence_ids"] == ["ev-1", "ev-2", "ev-3"]
     assert context["reasoning"][0]["asset"] == "GOLD"
+
+
+def test_reasoner_agent_uses_injected_llm_client_without_changing_decision():
+    def fake_llm(prompt):
+        return {
+            "summary": "Bullish evidence supports the deterministic decision.",
+            "key_points": ["Trend is bullish"],
+            "cited_evidence_ids": ["ev-1", "unknown-id"],
+        }
+
+    agent = ReasonerAgent(llm_client=fake_llm)
+    context = {
+        "decisions": [{"name": "GOLD", "bias": "BULLISH", "score": 100, "confidence": "HIGH"}],
+        "evidence": evidence(),
+    }
+
+    result = agent.run(context)
+    packet = result.data[0]
+
+    assert result.status == "success"
+    assert packet["score"] == 100
+    assert packet["bias"] == "BULLISH"
+    assert packet["explanation"]["cited_evidence_ids"] == ["ev-1"]
