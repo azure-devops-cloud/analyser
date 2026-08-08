@@ -29,3 +29,34 @@ class Evidence:
             "observed_at": self.observed_at.isoformat(),
             "metadata": self.metadata,
         }
+
+
+@dataclass
+class EvidencePacket:
+    """Canonical reasoning input; decisions remain authoritative elsewhere."""
+
+    asset: str
+    bias: str
+    score: float
+    confidence: Any = None
+    supporting: list[Evidence] = field(default_factory=list)
+    opposing: list[Evidence] = field(default_factory=list)
+    data_quality: float = 0.0
+    contradictions: list[dict[str, Any]] = field(default_factory=list)
+
+    @property
+    def evidence_count(self) -> int:
+        return len(self.supporting) + len(self.opposing)
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "asset": self.asset,
+            "bias": self.bias,
+            "score": self.score,
+            "confidence": self.confidence,
+            "supporting": [item.as_dict() for item in self.supporting],
+            "opposing": [item.as_dict() for item in self.opposing],
+            "evidence_count": self.evidence_count,
+            "data_quality": round(max(0.0, min(1.0, self.data_quality)), 3),
+            "contradictions": list(self.contradictions),
+        }
