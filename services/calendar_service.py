@@ -23,8 +23,10 @@ class CalendarService:
     ]
 
     KEYWORDS = [
-        "Fed", "FOMC", "CPI", "PPI", "NFP", "Payroll", "Employment",
-        "Interest Rate", "GDP", "Core PCE", "Personal Income", "PCE", "RBI",
+        "Fed", "FOMC", "CPI", "Consumer Price Index", "PPI", "Producer Price Index",
+        "NFP", "Payroll", "Employment", "Interest Rate", "GDP", "Core PCE",
+        "Personal Income", "Personal Consumption Expenditures", "PCE", "RBI",
+        "Retail Sales", "Unemployment", "Jobless Claims", "Nonfarm Payrolls",
     ]
 
     def __init__(self):
@@ -33,7 +35,8 @@ class CalendarService:
 
     @staticmethod
     def _matches(title):
-        return any(keyword.lower() in title.lower() for keyword in CalendarService.KEYWORDS)
+        normalized = " ".join(str(title).split()).lower()
+        return any(keyword.lower() in normalized for keyword in CalendarService.KEYWORDS)
 
     def _feed_events(self, name, url):
         response = requests.get(
@@ -125,7 +128,6 @@ class CalendarService:
                     failures.append(f"{name}: {ex}")
                     logger.warning("Official calendar source %s failed: %s", url, ex)
 
-        # De-duplicate the same event surfaced by multiple providers.
         unique = {}
         for event in events:
             key = (event.get("title", "").strip().lower(), event.get("published", ""))
