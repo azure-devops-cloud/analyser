@@ -5,12 +5,7 @@ from typing import Any
 
 
 class ReasonerService:
-    """Produce an evidence-grounded explanation of an existing decision.
-
-    This first version is deterministic by design: it does not invent facts and
-    never changes the legacy decision score or bias. A future LLM reasoner can
-    consume this normalized packet without becoming the source of truth.
-    """
+    """Produce an evidence-grounded explanation of an existing decision."""
 
     def analyze(self, decision: dict[str, Any], evidence: list[Any] | None = None) -> dict[str, Any]:
         evidence = evidence or []
@@ -34,28 +29,35 @@ class ReasonerService:
             strength = float(item.get("strength", 0) or 0)
             kind = item.get("kind", "unknown")
             value = item.get("value")
-            text = f"{claim} (strength {strength:.2f})"
+            normalized = {
+                "evidence_id": item.get("evidence_id"),
+                "kind": kind,
+                "claim": claim,
+                "value": value,
+                "strength": strength,
+                "metadata": item.get("metadata", {}),
+            }
             if kind == "technical":
                 if "Trend is BULLISH" in claim or ("RSI is" in claim and isinstance(value, (int, float)) and value < 30):
-                    supporting.append(text)
+                    supporting.append(normalized)
                 elif "Trend is BEARISH" in claim or ("RSI is" in claim and isinstance(value, (int, float)) and value > 70):
-                    opposing.append(text)
+                    opposing.append(normalized)
             elif kind == "momentum" and isinstance(value, (int, float)):
                 if value > 1:
-                    supporting.append(text)
+                    supporting.append(normalized)
                 elif value < -1:
-                    opposing.append(text)
+                    opposing.append(normalized)
             elif kind == "sentiment":
                 positive = value.get("positive", 0) if isinstance(value, dict) else 0
                 negative = value.get("negative", 0) if isinstance(value, dict) else 0
                 if positive > negative:
-                    supporting.append(text)
+                    supporting.append(normalized)
                 elif negative > positive:
-                    opposing.append(text)
+                    opposing.append(normalized)
             elif kind == "risk" and isinstance(value, (int, float)) and value > 40:
-                opposing.append(text)
+                opposing.append(normalized)
             elif kind == "macro":
-                opposing.append(text)
+                opposing.append(normalized)
 
         bias = decision.get("bias", "NEUTRAL")
         if bias == "BULLISH":
