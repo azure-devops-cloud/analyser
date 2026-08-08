@@ -1,7 +1,6 @@
 import json
 import logging
-import os
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 logger = logging.getLogger(__name__)
 
@@ -33,10 +32,29 @@ class LLMReasonerService:
             logger.warning("LLM reasoner unavailable; using deterministic fallback: %s", exc)
             return self._fallback(packet)
 
+    @staticmethod
+    def _evidence_id(item: Any) -> str | None:
+        if isinstance(item, dict):
+            value = item.get("evidence_id")
+            return str(value) if value is not None else None
+        return None
+
+    @staticmethod
+    def _claim(item: Any) -> str:
+        if isinstance(item, dict):
+            return str(item.get("claim", ""))
+        return str(item)
+
     def _validate(self, result: Dict[str, Any], packet: Dict[str, Any]) -> Dict[str, Any]:
-        allowed_ids = {item["evidence_id"] for item in packet.get("supporting", []) + packet.get("opposing", [])}
+        evidence_items = packet.get("supporting", []) + packet.get("opposing", [])
+        allowed_ids = {
+            evidence_id
+            for evidence_id in (self._evidence_id(item) for item in evidence_items)
+            if evidence_id
+        }
         cited = [str(item) for item in result.get("cited_evidence_ids", [])]
-        cited = [item for item in cited if item in allowed_ids]
+        cited = [item for item in cited if not allowed_ids or item in allowed_ids]
+
         return {
             "summary": str(result.get("summary", "")),
             "key_points": [str(item) for item in result.get("key_points", [])][:5],
@@ -48,6 +66,7 @@ class LLMReasonerService:
 
     def _fallback(self, packet: Dict[str, Any]) -> Dict[str, Any]:
         stance = packet.get("stance", "weak")
+        supporting = packet.get("supporting", [])
         summary = (
             f"{packet.get('asset', 'Market')} is {packet.get('bias', 'UNKNOWN')} "
             f"with {packet.get('evidence_count', 0)} supporting evidence item(s); "
@@ -56,8 +75,8 @@ class LLMReasonerService:
         return self._validate(
             {
                 "summary": summary,
-                "key_points": [item.get("claim", "") for item in packet.get("supporting", [])[:5]],
-                "cited_evidence_ids": [item.get("evidence_id") for item in packet.get("supporting", [])],
+                "key_points": [self._claim(item) for item in supporting[:5]],
+                "cited_evidence_ids": [self._evidence_id(item) for item in supporting if self._evidence_id(item)],
             },
             packet,
         )
