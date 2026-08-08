@@ -9,11 +9,15 @@ class ReasonerAgent(BaseAgent):
     def run(self, context):
         try:
             service = ReasonerService()
-            reasoning = [
-                service.analyze(decision, context.evidence)
-                for decision in context.decisions
-            ]
-            context.add_reasoning(reasoning)
+            decisions = context.get("decisions", []) if isinstance(context, dict) else context.decisions
+            evidence = context.get("evidence", []) if isinstance(context, dict) else context.evidence
+            reasoning = [service.analyze(decision, evidence) for decision in decisions]
+
+            if isinstance(context, dict):
+                context["reasoning"] = reasoning
+            else:
+                context.add_reasoning(reasoning)
+
             return AgentResult(
                 agent="reasoner_agent",
                 status="success",
