@@ -6,24 +6,30 @@ logger = logging.getLogger(__name__)
 
 
 class LLMReasonerService:
-    """Optional LLM synthesis layer; deterministic evidence remains authoritative."""
+    """Optional LLM synthesis; deterministic decisions remain authoritative."""
 
     def __init__(self, client=None):
         self.client = client
 
     def build_prompt(self, packet: Dict[str, Any]) -> str:
+        authoritative = {
+            "asset": packet.get("asset"),
+            "score": packet.get("score"),
+            "bias": packet.get("bias"),
+            "confidence": packet.get("confidence"),
+        }
         return (
             "You are a market-intelligence explanation assistant. "
-            "Use only the supplied evidence. Do not invent facts. "
-            "Do not change score, bias, confidence, or evidence IDs. "
+            "Use only the supplied evidence. Never invent facts or evidence IDs. "
+            "The deterministic decision is authoritative and MUST NOT be changed. "
             "Return JSON with keys: summary, key_points, cited_evidence_ids.\n\n"
+            f"Authoritative decision:\n{json.dumps(authoritative, sort_keys=True, default=str)}\n\n"
             f"Evidence packet:\n{json.dumps(packet, sort_keys=True, default=str)}"
         )
 
     def synthesize(self, packet: Dict[str, Any]) -> Dict[str, Any]:
         if self.client is None:
             return self._fallback(packet)
-
         try:
             response = self.client(self.build_prompt(packet))
             parsed = response if isinstance(response, dict) else json.loads(response)
@@ -53,8 +59,7 @@ class LLMReasonerService:
             if evidence_id
         }
         cited = [str(item) for item in result.get("cited_evidence_ids", [])]
-        cited = [item for item in cited if not allowed_ids or item in allowed_ids]
-
+        cited = [item for item in cited if item in allowed_ids]
         return {
             "summary": str(result.get("summary", "")),
             "key_points": [str(item) for item in result.get("key_points", [])][:5],
@@ -65,18 +70,17 @@ class LLMReasonerService:
         }
 
     def _fallback(self, packet: Dict[str, Any]) -> Dict[str, Any]:
-        stance = packet.get("stance", "weak")
         supporting = packet.get("supporting", [])
-        summary = (
-            f"{packet.get('asset', 'Market')} is {packet.get('bias', 'UNKNOWN')} "
-            f"with {packet.get('evidence_count', 0)} supporting evidence item(s); "
-            f"evidence stance is {stance}."
-        )
+        stance = packet.get("stance", "weak")
         return self._validate(
             {
-                "summary": summary,
+                "summary": (
+                    f"{packet.get('asset', 'Market')} is {packet.get('bias', 'UNKNOWN')} "
+                    f"with {packet.get('evidence_count', 0)} evidence item(s); "
+                    f"evidence stance is {stance}."
+                ),
                 "key_points": [self._claim(item) for item in supporting[:5]],
-                "cited_evidence_ids": [self._evidence_id(item) for item in supporting if self._evidence_id(item)],
+                "cited_evidence_ids": [self._evidence_id(item) for item in supporting],
             },
             packet,
         )
