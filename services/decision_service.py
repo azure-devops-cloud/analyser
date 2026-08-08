@@ -26,12 +26,14 @@ class DecisionService:
         else:
             reasons.append("RSI is neutral")
 
+        # Keep the intended legacy weight for daily momentum so the
+        # evidence layer does not silently change the decision contract.
         daily = market.get("daily_change", 0)
         if daily > 1:
-            score += 10
+            score += 5
             reasons.append("Positive daily momentum")
         elif daily < -1:
-            score -= 10
+            score -= 5
             reasons.append("Negative daily momentum")
 
         volatility = market.get("volatility", 20)
