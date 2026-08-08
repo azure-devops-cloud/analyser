@@ -17,8 +17,12 @@ class ReasonerAgent(BaseAgent):
             return AgentResult(
                 agent="reasoner_agent",
                 status="success",
-                data={"reasoning": reasoning},
+                data=reasoning,
                 count=len(reasoning),
             )
         except Exception as ex:
-            return AgentResult(agent="reasoner_agent", status="failed", errors=[str(ex)])
+            return AgentResult(
+                agent="reasoner_agent",
+                status="failed",
+                errors=[str(ex)],
+            )
