@@ -60,3 +60,7 @@ class EvidencePacket:
             "data_quality": round(max(0.0, min(1.0, self.data_quality)), 3),
             "contradictions": list(self.contradictions),
         }
+
+    # Backward-compatible alias for callers using the pre-canonical contract.
+    def to_dict(self) -> dict[str, Any]:
+        return self.as_dict()
