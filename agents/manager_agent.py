@@ -4,6 +4,7 @@ from agents.deduplication_agent import DeduplicationAgent
 from agents.ranking_agent import RankingAgent
 from agents.market_agent import MarketAgent
 from agents.decision_agent import DecisionAgent
+from agents.reasoner_agent import ReasonerAgent
 from agents.alert_agent import AlertAgent
 from agents.history_agent import HistoryAgent
 from agents.calendar_agent import CalendarAgent
@@ -36,6 +37,7 @@ class ManagerAgent:
             CalendarAgent(),
             TechnicalAnalysisAgent(),
             DecisionAgent(),
+            ReasonerAgent(),
             ConfidenceAgent(),
             RiskAgent(),
             AlertAgent(),
