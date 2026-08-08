@@ -1,9 +1,10 @@
 """Synthesize auditable evidence without changing deterministic decisions."""
 
 from collections import defaultdict
+from datetime import datetime
 from typing import Any
 
-from models.evidence import EvidencePacket, Evidence
+from models.evidence import Evidence, EvidencePacket
 
 
 class ReasonerService:
@@ -18,10 +19,12 @@ class ReasonerService:
             return 0.0
         checks = []
         for item in evidence:
-            checks.append(bool(item.get("evidence_id")))
-            checks.append(bool(item.get("source")))
-            checks.append(bool(item.get("claim")))
-            checks.append(0.0 <= float(item.get("strength", 0) or 0) <= 1.0)
+            checks.extend([
+                bool(item.get("evidence_id")),
+                bool(item.get("source")),
+                bool(item.get("claim")),
+                0.0 <= float(item.get("strength", 0) or 0) <= 1.0,
+            ])
         return round(sum(checks) / len(checks), 3)
 
     def _contradictions(self, evidence: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -29,7 +32,6 @@ class ReasonerService:
         by_kind = defaultdict(list)
         for item in evidence:
             by_kind[item.get("kind", "unknown")].append(item)
-
         for kind, items in by_kind.items():
             bullish = [x for x in items if "BULLISH" in str(x.get("claim", "")).upper()]
             bearish = [x for x in items if "BEARISH" in str(x.get("claim", "")).upper()]
@@ -42,10 +44,30 @@ class ReasonerService:
                 })
         return contradictions
 
+    def _to_evidence(self, item: dict[str, Any]) -> Evidence:
+        observed_at = item.get("observed_at")
+        if isinstance(observed_at, str):
+            try:
+                observed_at = datetime.fromisoformat(observed_at.replace("Z", "+00:00"))
+            except ValueError:
+                observed_at = None
+        kwargs = {
+            "evidence_id": str(item.get("evidence_id", "")),
+            "source": str(item.get("source") or "unknown"),
+            "kind": str(item.get("kind", "unknown")),
+            "claim": str(item.get("claim", "")),
+            "value": item.get("value"),
+            "strength": float(item.get("strength", 0) or 0),
+            "metadata": dict(item.get("metadata", {}) or {}),
+        }
+        if observed_at is not None:
+            kwargs["observed_at"] = observed_at
+        return Evidence(**kwargs)
+
     def analyze(self, decision: dict[str, Any], evidence: list[Any] | None = None) -> dict[str, Any]:
         evidence = evidence or []
         asset = decision.get("name", "UNKNOWN")
-        relevant = []
+        relevant: list[dict[str, Any]] = []
         for item in evidence:
             data = self._as_dict(item)
             if not data:
@@ -58,23 +80,22 @@ class ReasonerService:
         for item in relevant:
             groups[item.get("kind", "unknown")].append(item)
 
-        supporting = []
-        opposing = []
+        supporting: list[dict[str, Any]] = []
+        opposing: list[dict[str, Any]] = []
         for item in relevant:
             claim = item.get("claim", "")
-            strength = float(item.get("strength", 0) or 0)
-            kind = item.get("kind", "unknown")
             value = item.get("value")
             normalized = {
                 "evidence_id": item.get("evidence_id"),
-                "source": item.get("source"),
-                "kind": kind,
+                "source": item.get("source") or "unknown",
+                "kind": item.get("kind", "unknown"),
                 "claim": claim,
                 "value": value,
-                "strength": strength,
+                "strength": float(item.get("strength", 0) or 0),
                 "observed_at": item.get("observed_at"),
                 "metadata": item.get("metadata", {}),
             }
+            kind = normalized["kind"]
             if kind == "technical":
                 if "Trend is BULLISH" in claim or ("RSI is" in claim and isinstance(value, (int, float)) and value < 30):
                     supporting.append(normalized)
@@ -85,12 +106,10 @@ class ReasonerService:
                     supporting.append(normalized)
                 elif value < -1:
                     opposing.append(normalized)
-            elif kind == "sentiment":
-                positive = value.get("positive", 0) if isinstance(value, dict) else 0
-                negative = value.get("negative", 0) if isinstance(value, dict) else 0
-                if positive > negative:
+            elif kind == "sentiment" and isinstance(value, dict):
+                if value.get("positive", 0) > value.get("negative", 0):
                     supporting.append(normalized)
-                elif negative > positive:
+                elif value.get("negative", 0) > value.get("positive", 0):
                     opposing.append(normalized)
             elif kind == "risk" and isinstance(value, (int, float)) and value > 40:
                 opposing.append(normalized)
@@ -110,12 +129,12 @@ class ReasonerService:
             bias=bias,
             score=decision.get("score", 0),
             confidence=decision.get("confidence", "LOW"),
-            supporting=[Evidence(**{**item, "observed_at": __import__("datetime").datetime.fromisoformat(item["observed_at"])}) if item.get("observed_at") else Evidence(**{k: v for k, v in item.items() if k in {"evidence_id", "source", "kind", "claim", "value", "strength", "metadata"}}) for item in supporting],
-            opposing=[Evidence(**{**item, "observed_at": __import__("datetime").datetime.fromisoformat(item["observed_at"])}) if item.get("observed_at") else Evidence(**{k: v for k, v in item.items() if k in {"evidence_id", "source", "kind", "claim", "value", "strength", "metadata"}}) for item in opposing],
+            supporting=[self._to_evidence(item) for item in supporting],
+            opposing=[self._to_evidence(item) for item in opposing],
             data_quality=self._quality(relevant),
             contradictions=self._contradictions(relevant),
         )
-        result = packet.to_dict()
+        result = packet.as_dict()
         result["stance"] = stance
         result["reasoning"] = (
             f"{asset} is {bias} with score {decision.get('score', 0)}. "
