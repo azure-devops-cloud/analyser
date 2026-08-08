@@ -6,9 +6,13 @@ from services.logger import get_logger
 
 logger = get_logger(__name__)
 
+TELEGRAM_SKIPPED = "SKIPPED"
+TELEGRAM_SENT = "SENT"
+TELEGRAM_FAILED = "FAILED"
 
-def send_message(message, confidence_score=None, threshold=80):
 
+def send_message_status(message, confidence_score=None, threshold=80):
+    """Send a Telegram message and return SKIPPED, SENT, or FAILED."""
     token = os.getenv(
         "TELEGRAM_BOT_TOKEN",
         settings.TELEGRAM_BOT_TOKEN
@@ -25,13 +29,13 @@ def send_message(message, confidence_score=None, threshold=80):
             confidence_score,
             threshold,
         )
-        return False
+        return TELEGRAM_SKIPPED
 
     if not token or not chat_id:
-        logger.warning(
-            "Telegram credentials are not configured. Skipping Telegram notification."
+        logger.error(
+            "Telegram delivery failed: credentials are not configured."
         )
-        return False
+        return TELEGRAM_FAILED
 
     url = f"https://api.telegram.org/bot{token}/sendMessage"
 
@@ -46,22 +50,22 @@ def send_message(message, confidence_score=None, threshold=80):
             timeout=30
         )
 
-        # Keep this compatible with real requests.Response objects and
-        # lightweight response doubles used by the test suite.
         if response.status_code >= 400:
             logger.error(
                 "Telegram send failed with HTTP status %s: %s",
                 response.status_code,
                 response.text,
             )
-            return False
+            return TELEGRAM_FAILED
 
         logger.info("Telegram message sent successfully")
-        return True
+        return TELEGRAM_SENT
 
     except requests.RequestException as ex:
-        logger.exception(
-            "Telegram send failed: %s",
-            ex
-        )
-        return False
+        logger.exception("Telegram send failed: %s", ex)
+        return TELEGRAM_FAILED
+
+
+def send_message(message, confidence_score=None, threshold=80):
+    """Backward-compatible boolean wrapper around send_message_status."""
+    return send_message_status(message, confidence_score, threshold) == TELEGRAM_SENT
