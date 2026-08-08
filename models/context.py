@@ -17,6 +17,7 @@ class AgentContext:
         self.confidence = {}
         self.risk = {}
         self.evidence = []
+        self.reasoning = []
 
     def add_news(self, news):
         self.news = news
@@ -65,3 +66,7 @@ class AgentContext:
         if not evidence:
             return
         self.evidence.extend(evidence)
+
+    def add_reasoning(self, reasoning):
+        """Store evidence-grounded reasoning without mutating decisions."""
+        self.reasoning = reasoning or []
