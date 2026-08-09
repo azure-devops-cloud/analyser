@@ -93,11 +93,12 @@ def test_manager_agent_run_smoke_pipeline(tmp_path, monkeypatch):
     manager = ManagerAgent()
     results, context = manager.run()
 
-    assert len(results) == 16
+    assert len(results) == 17
     assert all(result.status == "success" for result in results)
     assert context.market
     assert context.news
     assert context.news_sentiment
+    assert context.news_intelligence
     assert context.decisions
     assert context.reasoning
 
@@ -644,7 +645,7 @@ def test_main_requires_telegram_credentials_for_live_run(monkeypatch, capsys):
             {
                 "run": lambda self: (
                     [
-                        FakeResult("news_agent", "success", {"total_checked": 1, "analysis": {"categories": {"fed": 1}, "impact": {"HIGH": 1}}}, 1)
+                        FakeResult("news_agent", "success", {"total_checked": 1, "analysis": {"categories": {"fed": 1}, "impact": {"HIGH": 1}},}, 1)
                     ],
                     {}
                 )
