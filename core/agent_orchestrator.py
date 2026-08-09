@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from re import sub
 from time import sleep
 from typing import Callable, Iterable, Optional
 
@@ -39,6 +40,15 @@ class AgentOrchestrator:
                 on_result(result, agent)
         return results
 
+    @staticmethod
+    def _agent_id(agent) -> str:
+        """Return a stable public identifier for an agent result."""
+        explicit = getattr(agent, "agent_name", None) or getattr(agent, "name", None)
+        if explicit:
+            return explicit
+        class_name = agent.__class__.__name__
+        return sub(r"(?<!^)(?=[A-Z])", "_", class_name).lower()
+
     def _execute_agent(self, agent, context) -> AgentResult:
         attempts = self.recovery_policy.max_retries + 1
         last_error = None
@@ -48,7 +58,7 @@ class AgentOrchestrator:
                 result = agent.run(context)
                 if not isinstance(result, AgentResult):
                     return AgentResult(
-                        agent=getattr(agent, "name", agent.__class__.__name__),
+                        agent=self._agent_id(agent),
                         status="failed",
                         errors=["Agent returned an invalid result type"],
                     )
@@ -68,7 +78,7 @@ class AgentOrchestrator:
                 sleep(self.recovery_policy.backoff_seconds * attempt)
 
         return AgentResult(
-            agent=getattr(agent, "name", agent.__class__.__name__),
+            agent=self._agent_id(agent),
             status="failed",
             errors=[last_error or "agent execution failed after recovery attempts"],
         )
