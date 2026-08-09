@@ -93,12 +93,13 @@ def test_manager_agent_run_smoke_pipeline(tmp_path, monkeypatch):
     manager = ManagerAgent()
     results, context = manager.run()
 
-    assert len(results) == 15
+    assert len(results) == 16
     assert all(result.status == "success" for result in results)
     assert context.market
     assert context.news
     assert context.news_sentiment
     assert context.decisions
+    assert context.reasoning
 
 
 def test_summary_agent_builds_human_readable_summary():
