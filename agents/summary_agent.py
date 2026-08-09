@@ -7,21 +7,9 @@ class SummaryAgent(BaseAgent):
 
     @staticmethod
     def _news_brief(news_items, evidence):
-        evidence_ids = {
-            item.get("evidence_id")
-            for item in evidence or []
-            if isinstance(item, dict) and item.get("evidence_id")
-        }
+        evidence_ids = {item.get("evidence_id") for item in evidence or [] if isinstance(item, dict) and item.get("evidence_id")}
         brief = []
-        for item in sorted(
-            news_items or [],
-            key=lambda value: (
-                value.get("actionability", 0),
-                value.get("importance", value.get("importance_score", 0)),
-                value.get("freshness", 0),
-            ),
-            reverse=True,
-        )[:5]:
+        for item in sorted(news_items or [], key=lambda value: (value.get("actionability", 0), value.get("importance", value.get("importance_score", 0)), value.get("freshness", 0)), reverse=True)[:5]:
             cited = []
             if item.get("evidence_id"):
                 cited.append(item["evidence_id"])
@@ -59,12 +47,7 @@ class SummaryAgent(BaseAgent):
             neutral = sentiment.get("neutral", 0)
             fact_confidence = float(fact_validation.get("confidence_score", 100))
             fact_status = fact_validation.get("verification_status", "validated")
-
-            top_story = max(
-                news_items,
-                key=lambda item: item.get("actionability", item.get("importance_score", 0)),
-                default=None,
-            )
+            top_story = max(news_items, key=lambda item: item.get("actionability", item.get("importance_score", 0)), default=None)
             market_signal = max(market_items, key=lambda item: abs(item.get("daily_change", 0)), default=None)
             top_decision = max(decisions, key=lambda item: item.get("score", 0), default=None)
 
@@ -78,8 +61,8 @@ class SummaryAgent(BaseAgent):
             elif market_signal:
                 market_bias = market_signal.get("trend", "NEUTRAL").lower()
                 top_opportunity = market_signal.get("name", "N/A")
-
             market_posture = market_bias.capitalize()
+
             if negative >= positive:
                 risk_caveat = "Risk remains elevated because the news flow is leaning negative."
             elif top_score < 70:
@@ -98,17 +81,17 @@ class SummaryAgent(BaseAgent):
 
             intelligence_brief = self._news_brief(news_items, evidence)
             headline = f"Executive view: {market_posture} posture | Lead: {top_opportunity} | Action: {action_recommendation}"
-            summary = (
-                f"{market_posture} posture is in focus, with {top_opportunity} as the leading opportunity. "
-                f"News tone is {positive} positive, {negative} negative, and {neutral} neutral. "
-                f"Risk watch: {risk_caveat}"
-            )
+            summary = f"{market_posture} posture is in focus, with {top_opportunity} as the leading opportunity. News tone is {positive} positive, {negative} negative, and {neutral} neutral. Risk watch: {risk_caveat}"
             if top_story:
                 summary += f" Lead intelligence: '{top_story.get('title', 'No headline available')}' ({top_story.get('impact', 'unknown')} impact)."
             if fact_status != "validated":
                 summary += f" Verification is limited to {fact_validation.get('evidence_count', 0)} confirmed signals."
             if alerts:
                 summary += f" Active alert: {alerts[0].get('message', 'Actionable alert available.')}"
+
+            risk_watch = risk_caveat
+            if risk:
+                risk_watch = f"{risk.get('level', 'unknown').capitalize()} risk: {risk.get('reasons', [risk_caveat])[0]}"
 
             return AgentResult(
                 agent="summary_agent",
@@ -122,7 +105,7 @@ class SummaryAgent(BaseAgent):
                     "watchlist": top_opportunity if top_opportunity != "N/A" else "No clear lead",
                     "top_score": top_score,
                     "risk_caveat": risk_caveat,
-                    "risk_watch": risk.get("level", "unknown").capitalize() + " risk: " + (risk.get("reasons", [risk_caveat])[0] if risk else risk_caveat),
+                    "risk_watch": risk_watch,
                     "action_recommendation": action_recommendation,
                     "top_story": top_story,
                     "top_decision": top_decision,
