@@ -73,7 +73,9 @@ class NewsIntelligenceService:
 
     @staticmethod
     def _story_key(title: str) -> str:
-        normalized = re.sub(r"\b(?:reports?|according to|via)\s+[a-z0-9._-]+\b", " ", title.lower())
+        normalized = title.lower()
+        normalized = re.sub(r"[,;:]\s*(?:reports?|according to|via)\s+.+$", " ", normalized)
+        normalized = re.sub(r"\b(?:reports?|according to|via)\s+[a-z0-9._-]+(?:\s+[a-z0-9._-]+)?\b", " ", normalized)
         words = re.findall(r"[a-z0-9]+", normalized)
         stop = {
             "the", "a", "an", "to", "of", "in", "on", "for", "and", "with", "says", "said", "as",
