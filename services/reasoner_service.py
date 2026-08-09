@@ -17,13 +17,15 @@ class ReasonerService:
     def _quality(self, evidence: list[dict[str, Any]]) -> float:
         if not evidence:
             return 0.0
-        checks = []
+        scores = []
         for item in evidence:
-            checks.extend([
+            strength = float(item.get("strength", 0) or 0)
+            completeness = sum([
                 bool(item.get("evidence_id")), bool(item.get("source")),
-                bool(item.get("claim")), 0.0 <= float(item.get("strength", 0) or 0) <= 1.0,
-            ])
-        return round(sum(checks) / len(checks), 3)
+                bool(item.get("claim")), 0.0 <= strength <= 1.0,
+            ]) / 4.0
+            scores.append(completeness * max(0.0, min(1.0, strength)))
+        return round(sum(scores) / len(scores), 3)
 
     def _contradictions(self, evidence: list[dict[str, Any]]) -> list[dict[str, Any]]:
         by_kind = defaultdict(lambda: {"supporting": [], "opposing": []})
