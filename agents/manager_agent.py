@@ -25,7 +25,10 @@ from config.settings import SETTINGS
 from core.agent_orchestrator import AgentOrchestrator, RecoveryPolicy
 from core.agent_registry import AgentRegistry
 from core.execution_graph import ExecutionGraph
+from core.health_monitor import HealthMonitor
+from core.memory_store import MemoryStore
 from core.run_planner import RunPlanner
+from core.validation_engine import ValidationEngine
 from models.domain import AgentStatus, ExecutionMetric
 from services.logger import get_logger
 from services.metrics_service import MetricsService
@@ -34,9 +37,9 @@ logger = get_logger(__name__)
 
 
 class ManagerAgent:
-    """Top-level workflow agent coordinating the autonomous agent fleet."""
+    """Supervisor/control-plane agent coordinating the autonomous intelligence fleet."""
 
-    def __init__(self, orchestrator=None, planner=None):
+    def __init__(self, orchestrator=None, planner=None, memory_store=None):
         self.run_id = uuid4().hex
         self.context = AgentContext(run_id=self.run_id)
         self.agents = [
@@ -74,6 +77,9 @@ class ManagerAgent:
                 stop_on_critical_failure=SETTINGS.agent_stop_on_critical_failure,
             )
         )
+        self.memory = memory_store or MemoryStore(SETTINGS.database_path)
+        self.validator = ValidationEngine()
+        self.health = HealthMonitor()
 
     def run(self):
         metrics = MetricsService()
@@ -87,10 +93,7 @@ class ManagerAgent:
 
         def on_start(agent):
             node_name = self.registry.metadata_for(agent).name
-            started_state[node_name] = (
-                datetime.now(timezone.utc),
-                perf_counter(),
-            )
+            started_state[node_name] = (datetime.now(timezone.utc), perf_counter())
             self.execution_graph.mark_running(node_name)
 
         def on_result(result, agent):
@@ -141,11 +144,51 @@ class ManagerAgent:
         finally:
             metrics.close()
 
+        validation = self.validator.validate(self.context.decisions, self.context.evidence)
+        self.context.set_metadata("validation", validation.as_dict())
+        self.context.set_metadata(
+            "health",
+            [signal.as_dict() for signal in self.health.assess(results, self.context)],
+        )
+        self.context.set_metadata("degraded", not validation.passed or bool(self.context.errors))
+
+        # Selective episodic memory: keep compact outcomes, not raw external content.
+        self.memory.put(
+            f"run:{self.run_id}",
+            "episodic_run",
+            {
+                "run_id": self.run_id,
+                "plan_id": plan.plan_id,
+                "validation": validation.as_dict(),
+                "errors": list(self.context.errors),
+                "decision_count": len(self.context.decisions),
+                "evidence_count": len(self.context.evidence),
+            },
+            ttl_days=90,
+        )
+        for decision in self.context.decisions:
+            if isinstance(decision, dict):
+                name = str(decision.get("name") or decision.get("asset") or "unknown").lower()
+                self.memory.put(
+                    f"decision:{name}:{self.run_id}",
+                    "decision_history",
+                    {
+                        "run_id": self.run_id,
+                        "asset": name,
+                        "bias": decision.get("bias"),
+                        "score": decision.get("score"),
+                        "confidence": decision.get("confidence"),
+                    },
+                    ttl_days=365,
+                )
+
         self.context.add_execution(
             {
                 "run_id": self.run_id,
                 "graph": self.execution_graph.snapshot(),
                 "context": self.context.snapshot(),
+                "validation": validation.as_dict(),
+                "health": self.context.metadata["health"],
                 "orchestration": {
                     "mode": plan.mode,
                     "plan_id": plan.plan_id,
@@ -154,12 +197,8 @@ class ManagerAgent:
                     "recovery": {
                         "max_retries": self.orchestrator.recovery_policy.max_retries,
                         "backoff_seconds": self.orchestrator.recovery_policy.backoff_seconds,
-                        "retryable_patterns": list(
-                            self.orchestrator.recovery_policy.retryable_patterns
-                        ),
-                        "stop_on_critical_failure": (
-                            self.orchestrator.recovery_policy.stop_on_critical_failure
-                        ),
+                        "retryable_patterns": list(self.orchestrator.recovery_policy.retryable_patterns),
+                        "stop_on_critical_failure": self.orchestrator.recovery_policy.stop_on_critical_failure,
                     },
                     "events": [event.as_dict() for event in self.context.events],
                 },
