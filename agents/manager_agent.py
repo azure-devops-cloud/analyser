@@ -4,6 +4,7 @@ from agents.deduplication_agent import DeduplicationAgent
 from agents.ranking_agent import RankingAgent
 from agents.market_agent import MarketAgent
 from agents.decision_agent import DecisionAgent
+from agents.reasoner_agent import ReasonerAgent
 from agents.alert_agent import AlertAgent
 from agents.history_agent import HistoryAgent
 from agents.calendar_agent import CalendarAgent
@@ -18,7 +19,9 @@ from core.execution_graph import ExecutionGraph
 from models.domain import AgentStatus, ExecutionMetric
 from services.logger import get_logger
 from services.metrics_service import MetricsService
-
+from datetime import datetime, timezone
+from time import perf_counter
+from uuid import uuid4
 
 logger = get_logger(__name__)
 
@@ -36,6 +39,7 @@ class ManagerAgent:
             CalendarAgent(),
             TechnicalAnalysisAgent(),
             DecisionAgent(),
+            ReasonerAgent(),
             ConfidenceAgent(),
             RiskAgent(),
             AlertAgent(),
@@ -59,14 +63,12 @@ class ManagerAgent:
                 result = agent.run(self.context)
                 duration_ms = (perf_counter() - started) * 1000
                 results.append(result)
-
                 if result.status == "success":
                     self.execution_graph.mark_success(node_name)
                 else:
                     error = ", ".join(result.errors) or "unknown error"
                     self.execution_graph.mark_failed(node_name, error)
                     self.context.add_error(f"{result.agent}: {error}")
-
                 try:
                     metrics.record(
                         ExecutionMetric(
@@ -84,11 +86,5 @@ class ManagerAgent:
                     logger.exception("Unable to persist metric for %s", result.agent)
         finally:
             metrics.close()
-
-        self.context.add_execution(
-            {"run_id": self.run_id, "graph": self.execution_graph.snapshot()}
-        )
+        self.context.add_execution({"run_id": self.run_id, "graph": self.execution_graph.snapshot()})
         return results, self.context
-from datetime import datetime, timezone
-from time import perf_counter
-from uuid import uuid4
