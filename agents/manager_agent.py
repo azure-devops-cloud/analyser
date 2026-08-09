@@ -22,6 +22,7 @@ from agents.technical_analysis_agent import TechnicalAnalysisAgent
 from agents.confidence_agent import ConfidenceAgent
 from agents.risk_agent import RiskAgent
 from core.agent_orchestrator import AgentOrchestrator, RecoveryPolicy
+from core.agent_registry import AgentRegistry
 from core.execution_graph import ExecutionGraph
 from core.run_planner import RunPlanner
 from models.domain import AgentStatus, ExecutionMetric
@@ -35,8 +36,8 @@ class ManagerAgent:
     """Top-level workflow agent coordinating the autonomous agent fleet."""
 
     def __init__(self, orchestrator=None, planner=None):
-        self.context = AgentContext()
         self.run_id = uuid4().hex
+        self.context = AgentContext(run_id=self.run_id)
         self.agents = [
             NewsCollectorAgent(),
             NewsIntelligenceAgent(),
@@ -57,9 +58,13 @@ class ManagerAgent:
             MonitoringAgent(),
             SummaryAgent(),
         ]
+        self.registry = AgentRegistry(self.agents)
         self.execution_graph = ExecutionGraph()
-        for agent in self.agents:
-            self.execution_graph.add_node(agent.__class__.__name__)
+        for metadata in self.registry.metadata():
+            self.execution_graph.add_node(
+                metadata.name,
+                metadata={"phase": metadata.phase, "capabilities": list(metadata.capabilities)},
+            )
         self.planner = planner or RunPlanner()
         self.orchestrator = orchestrator or AgentOrchestrator(
             RecoveryPolicy(max_retries=1, backoff_seconds=0.25)
@@ -69,9 +74,14 @@ class ManagerAgent:
         metrics = MetricsService()
         started_state = {}
         plan = self.planner.plan(self.agents, self.context)
+        self.context.set_metadata("plan_id", plan.plan_id)
+        self.context.set_metadata(
+            "agent_capabilities",
+            [metadata.as_dict() for metadata in self.registry.metadata()],
+        )
 
         def on_start(agent):
-            node_name = agent.__class__.__name__
+            node_name = self.registry.metadata_for(agent).name
             started_state[node_name] = (
                 datetime.now(timezone.utc),
                 perf_counter(),
@@ -79,7 +89,7 @@ class ManagerAgent:
             self.execution_graph.mark_running(node_name)
 
         def on_result(result, agent):
-            node_name = agent.__class__.__name__
+            node_name = self.registry.metadata_for(agent).name
             started_at, started = started_state[node_name]
             duration_ms = (perf_counter() - started) * 1000
 
@@ -91,6 +101,7 @@ class ManagerAgent:
                 self.context.add_error(f"{result.agent}: {error}")
 
             try:
+                step = next(step for step in plan.steps if step.agent is agent)
                 metrics.record(
                     ExecutionMetric(
                         run_id=self.run_id,
@@ -104,10 +115,11 @@ class ManagerAgent:
                     metadata={
                         "graph_node": node_name,
                         "orchestration": "autonomous",
-                        "plan_phase": next(
-                            step.phase for step in plan.steps
-                            if step.agent is agent
-                        ),
+                        "plan_id": plan.plan_id,
+                        "plan_phase": step.phase,
+                        "task_id": result.task_id,
+                        "attempts": result.attempts,
+                        "retryable": result.retryable,
                     },
                 )
             except Exception:
@@ -128,8 +140,10 @@ class ManagerAgent:
             {
                 "run_id": self.run_id,
                 "graph": self.execution_graph.snapshot(),
+                "context": self.context.snapshot(),
                 "orchestration": {
                     "mode": plan.mode,
+                    "plan_id": plan.plan_id,
                     "plan_reason": plan.reason,
                     "planned_agents": plan.agent_names,
                     "recovery": {
@@ -142,6 +156,7 @@ class ManagerAgent:
                             self.orchestrator.recovery_policy.stop_on_critical_failure
                         ),
                     },
+                    "events": [event.as_dict() for event in self.context.events],
                 },
             }
         )
