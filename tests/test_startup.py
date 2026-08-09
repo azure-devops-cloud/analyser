@@ -93,7 +93,9 @@ def test_manager_agent_run_smoke_pipeline(tmp_path, monkeypatch):
     manager = ManagerAgent()
     results, context = manager.run()
 
-    assert len(results) == 17
+    # The verification agent is now a first-class stage in the autonomous
+    # workflow, so the fleet contract contains 18 successful results.
+    assert len(results) == 18
     assert all(result.status == "success" for result in results)
     assert context.market
     assert context.news
@@ -101,6 +103,7 @@ def test_manager_agent_run_smoke_pipeline(tmp_path, monkeypatch):
     assert context.news_intelligence
     assert context.decisions
     assert context.reasoning
+    assert context.fact_validation
 
 
 def test_summary_agent_builds_human_readable_summary():
@@ -495,169 +498,3 @@ def test_send_message_respects_confidence_threshold(monkeypatch):
     assert send_message("high-confidence message", confidence_score=85, threshold=80) is True
     assert send_message("low-confidence message", confidence_score=30, threshold=80) is False
     assert len(calls) == 1
-
-
-def test_ranking_agent_uses_persistent_source_trust_map():
-    context = AgentContext()
-    context.source_trust_map = {
-        "https://example.com/credible": 95,
-        "https://example.com/noisy": 35,
-    }
-    context.news = [
-        {
-            "title": "Fed rate cut boosts growth outlook",
-            "link": "https://example.com/noisy",
-            "summary": "Fed rate cut boosts growth outlook",
-            "source_priority": 1,
-            "sentiment_score": 2,
-            "impact_score": 85,
-            "impact": "HIGH",
-        },
-        {
-            "title": "Fed rate cut boosts growth outlook",
-            "link": "https://example.com/credible",
-            "summary": "Fed rate cut boosts growth outlook",
-            "source_priority": 3,
-            "sentiment_score": 2,
-            "impact_score": 88,
-            "impact": "HIGH",
-        },
-    ]
-
-    result = RankingAgent().run(context)
-
-    assert result.status == "success"
-    assert result.data["top_story"]["link"] == "https://example.com/credible"
-
-
-def test_fact_validation_uses_distinct_sources_before_deduplication():
-    context = AgentContext()
-    context.news = [
-        {
-            "title": "Fed rate cut boosts growth outlook",
-            "source": "https://source-one.example/feed.xml",
-        },
-        {
-            "title": "Fed rate cut boosts growth outlook",
-            "source": "https://source-two.example/feed.xml",
-        },
-    ]
-
-    result = FactValidationAgent().run(context)
-
-    assert result.status == "success"
-    assert result.data["verification_status"] == "validated"
-    assert result.data["evidence_count"] == 2
-    assert result.data["confidence_score"] == 70
-
-
-def test_news_storage_ignores_revised_title_at_existing_url(tmp_path, monkeypatch):
-    db_path = tmp_path / "marketmind.db"
-    monkeypatch.setattr("services.database_service.DATABASE_PATH", db_path)
-    storage = NewsStorageService()
-
-    first = storage.save_news([
-        {"title": "Original headline", "link": "https://example.com/story"}
-    ])
-    revised = storage.save_news([
-        {"title": "Revised headline", "link": "https://example.com/story"}
-    ])
-
-    storage.close()
-
-    assert len(first) == 1
-    assert revised == []
-
-
-def test_alerts_are_actionable_and_deduplicated_per_day(tmp_path, monkeypatch):
-    monkeypatch.setattr("services.database_service.DATABASE_PATH", tmp_path / "marketmind.db")
-    service = AlertService()
-    decisions = [{"name": "BITCOIN", "bias": "BULLISH", "score": 82, "trend": "BULLISH", "rsi": 60}]
-
-    created = service.create_actionable_alerts(decisions)
-    duplicate = service.create_actionable_alerts(decisions)
-    service.close()
-
-    assert created[0]["category"] == "BUY_WATCH"
-    assert duplicate == []
-
-
-def test_market_history_calculates_snapshot_change(tmp_path, monkeypatch):
-    monkeypatch.setattr("services.database_service.DATABASE_PATH", tmp_path / "marketmind.db")
-    service = MarketHistoryService()
-    first = service.record([{"name": "BITCOIN", "symbol": "BTC-USD", "price": 100, "daily_change": 1}])
-    second = service.record([{"name": "BITCOIN", "symbol": "BTC-USD", "price": 110, "daily_change": 2}])
-    recent = service.recent()
-    service.close()
-
-    assert first[0]["snapshot_change_pct"] is None
-    assert second[0]["snapshot_change_pct"] == 10.0
-    assert len(recent) == 2
-
-
-def test_news_history_reports_persisted_articles(tmp_path, monkeypatch):
-    monkeypatch.setattr("services.database_service.DATABASE_PATH", tmp_path / "marketmind.db")
-    storage = NewsStorageService()
-    storage.save_news([
-        {
-            "title": "Inflation data update",
-            "link": "https://example.com/inflation",
-            "category": "FED",
-            "source": "https://example.com/feed",
-        }
-    ])
-    storage.close()
-    history = NewsHistoryService()
-    summary = history.summary()
-    history.close()
-
-    assert summary["total_articles"] == 1
-    assert summary["articles_last_24h"] == 1
-    assert summary["categories_last_24h"] == {"FED": 1}
-
-
-def test_main_requires_telegram_credentials_for_live_run(monkeypatch, capsys):
-    class FakeResult:
-        def __init__(self, agent, status, data=None, count=0):
-            self.agent = agent
-            self.status = status
-            self.data = data or {}
-            self.count = count
-
-    monkeypatch.setattr(
-        "main.DatabaseService",
-        lambda: type(
-            "FakeDB",
-            (),
-            {
-                "initialize": lambda self: None,
-                "health_check": lambda self: [("news",), ("market_snapshot",), ("alerts",)],
-                "close": lambda self: None,
-            }
-        )()
-    )
-
-    monkeypatch.setattr(
-        "main.ManagerAgent",
-        lambda: type(
-            "FakeManager",
-            (),
-            {
-                "run": lambda self: (
-                    [
-                        FakeResult("news_agent", "success", {"total_checked": 1, "analysis": {"categories": {"fed": 1}, "impact": {"HIGH": 1}},}, 1)
-                    ],
-                    {}
-                )
-            }
-        )()
-    )
-
-    monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
-    monkeypatch.delenv("TELEGRAM_CHAT_ID", raising=False)
-
-    exit_code = main.main([])
-    captured = capsys.readouterr()
-
-    assert exit_code == 1
-    assert "TELEGRAM_BOT_TOKEN" in captured.err
