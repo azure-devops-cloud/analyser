@@ -1,6 +1,6 @@
 """Deterministic validation and confidence guardrails for agent outputs."""
 
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass
 from typing import Any, Iterable
 
 
@@ -25,7 +25,7 @@ class ValidationReport:
         return {
             "passed": self.passed,
             "confidence": self.confidence,
-            "issues": [issue.__dict__ for issue in self.issues],
+            "issues": [asdict(issue) for issue in self.issues],
             "evidence_coverage": self.evidence_coverage,
             "corroboration": self.corroboration,
             "freshness": self.freshness,
