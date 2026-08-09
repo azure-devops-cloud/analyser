@@ -20,29 +20,33 @@ class ReasonerService:
         checks = []
         for item in evidence:
             checks.extend([
-                bool(item.get("evidence_id")),
-                bool(item.get("source")),
-                bool(item.get("claim")),
-                0.0 <= float(item.get("strength", 0) or 0) <= 1.0,
+                bool(item.get("evidence_id")), bool(item.get("source")),
+                bool(item.get("claim")), 0.0 <= float(item.get("strength", 0) or 0) <= 1.0,
             ])
         return round(sum(checks) / len(checks), 3)
 
     def _contradictions(self, evidence: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        contradictions = []
-        by_kind = defaultdict(list)
+        by_kind = defaultdict(lambda: {"supporting": [], "opposing": []})
         for item in evidence:
-            by_kind[item.get("kind", "unknown")].append(item)
-        for kind, items in by_kind.items():
-            bullish = [x for x in items if "BULLISH" in str(x.get("claim", "")).upper()]
-            bearish = [x for x in items if "BEARISH" in str(x.get("claim", "")).upper()]
-            if bullish and bearish:
-                contradictions.append({
+            claim = str(item.get("claim", "")).upper()
+            kind = item.get("kind", "unknown")
+            if "BULLISH" in claim:
+                by_kind[kind]["supporting"].append(item)
+            elif "BEARISH" in claim:
+                by_kind[kind]["opposing"].append(item)
+
+        result = []
+        for kind, sides in by_kind.items():
+            if sides["supporting"] and sides["opposing"]:
+                ids = [x.get("evidence_id") for x in sides["supporting"] + sides["opposing"]]
+                result.append({
                     "kind": kind,
                     "type": "directional_conflict",
-                    "evidence_ids": [x.get("evidence_id") for x in bullish + bearish],
+                    "evidence_ids": [x for x in ids if x],
+                    "severity": "HIGH" if len(ids) >= 3 else "MEDIUM",
                     "description": f"Conflicting bullish and bearish {kind} evidence.",
                 })
-        return contradictions
+        return result
 
     def _to_evidence(self, item: dict[str, Any]) -> Evidence:
         observed_at = item.get("observed_at")
@@ -67,7 +71,7 @@ class ReasonerService:
     def analyze(self, decision: dict[str, Any], evidence: list[Any] | None = None) -> dict[str, Any]:
         evidence = evidence or []
         asset = decision.get("name", "UNKNOWN")
-        relevant: list[dict[str, Any]] = []
+        relevant = []
         for item in evidence:
             data = self._as_dict(item)
             if not data:
@@ -80,65 +84,46 @@ class ReasonerService:
         for item in relevant:
             groups[item.get("kind", "unknown")].append(item)
 
-        supporting: list[dict[str, Any]] = []
-        opposing: list[dict[str, Any]] = []
+        supporting, opposing = [], []
         for item in relevant:
-            claim = item.get("claim", "")
-            value = item.get("value")
+            claim, value = item.get("claim", ""), item.get("value")
             normalized = {
-                "evidence_id": item.get("evidence_id"),
-                "source": item.get("source") or "unknown",
-                "kind": item.get("kind", "unknown"),
-                "claim": claim,
-                "value": value,
-                "strength": float(item.get("strength", 0) or 0),
-                "observed_at": item.get("observed_at"),
+                "evidence_id": item.get("evidence_id"), "source": item.get("source") or "unknown",
+                "kind": item.get("kind", "unknown"), "claim": claim, "value": value,
+                "strength": float(item.get("strength", 0) or 0), "observed_at": item.get("observed_at"),
                 "metadata": item.get("metadata", {}),
             }
             kind = normalized["kind"]
             if kind == "technical":
-                if "Trend is BULLISH" in claim or ("RSI is" in claim and isinstance(value, (int, float)) and value < 30):
-                    supporting.append(normalized)
-                elif "Trend is BEARISH" in claim or ("RSI is" in claim and isinstance(value, (int, float)) and value > 70):
-                    opposing.append(normalized)
+                if "Trend is BULLISH" in claim or ("RSI is" in claim and isinstance(value, (int, float)) and value < 30): supporting.append(normalized)
+                elif "Trend is BEARISH" in claim or ("RSI is" in claim and isinstance(value, (int, float)) and value > 70): opposing.append(normalized)
             elif kind == "momentum" and isinstance(value, (int, float)):
-                if value > 1:
-                    supporting.append(normalized)
-                elif value < -1:
-                    opposing.append(normalized)
+                if value > 1: supporting.append(normalized)
+                elif value < -1: opposing.append(normalized)
             elif kind == "sentiment" and isinstance(value, dict):
-                if value.get("positive", 0) > value.get("negative", 0):
-                    supporting.append(normalized)
-                elif value.get("negative", 0) > value.get("positive", 0):
-                    opposing.append(normalized)
-            elif kind == "risk" and isinstance(value, (int, float)) and value > 40:
-                opposing.append(normalized)
-            elif kind == "macro":
-                opposing.append(normalized)
+                if value.get("positive", 0) > value.get("negative", 0): supporting.append(normalized)
+                elif value.get("negative", 0) > value.get("positive", 0): opposing.append(normalized)
+            elif kind == "risk" and isinstance(value, (int, float)) and value > 40: opposing.append(normalized)
+            elif kind == "macro": opposing.append(normalized)
 
         bias = decision.get("bias", "NEUTRAL")
-        if bias == "BULLISH":
-            stance = "supporting" if supporting else "weak"
-        elif bias == "BEARISH":
-            stance = "supporting" if opposing else "weak"
-        else:
-            stance = "mixed"
+        if bias == "BULLISH": stance = "supporting" if supporting else "weak"
+        elif bias == "BEARISH": stance = "supporting" if opposing else "weak"
+        else: stance = "mixed"
 
+        contradictions = self._contradictions(relevant)
+        evidence_status = "CONFLICTED" if contradictions else ("SUPPORTED" if supporting or opposing else "INSUFFICIENT")
         packet = EvidencePacket(
-            asset=asset,
-            bias=bias,
-            score=decision.get("score", 0),
-            confidence=decision.get("confidence", "LOW"),
+            asset=asset, bias=bias, score=decision.get("score", 0), confidence=decision.get("confidence", "LOW"),
             supporting=[self._to_evidence(item) for item in supporting],
             opposing=[self._to_evidence(item) for item in opposing],
-            data_quality=self._quality(relevant),
-            contradictions=self._contradictions(relevant),
+            data_quality=self._quality(relevant), contradictions=contradictions,
         )
         result = packet.as_dict()
-        result["stance"] = stance
-        result["reasoning"] = (
-            f"{asset} is {bias} with score {decision.get('score', 0)}. "
-            f"Evidence is {stance}; {len(supporting)} supporting and {len(opposing)} opposing signals were found."
-        )
-        result["evidence_by_kind"] = {kind: len(items) for kind, items in groups.items()}
+        result.update({
+            "stance": stance,
+            "evidence_status": evidence_status,
+            "reasoning": f"{asset} is {bias} with score {decision.get('score', 0)}. Evidence is {stance}; {len(supporting)} supporting and {len(opposing)} opposing signals were found.",
+            "evidence_by_kind": {kind: len(items) for kind, items in groups.items()},
+        })
         return result
