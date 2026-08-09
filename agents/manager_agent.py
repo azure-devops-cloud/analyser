@@ -21,6 +21,7 @@ from agents.summary_agent import SummaryAgent
 from agents.technical_analysis_agent import TechnicalAnalysisAgent
 from agents.confidence_agent import ConfidenceAgent
 from agents.risk_agent import RiskAgent
+from config.settings import SETTINGS
 from core.agent_orchestrator import AgentOrchestrator, RecoveryPolicy
 from core.agent_registry import AgentRegistry
 from core.execution_graph import ExecutionGraph
@@ -67,7 +68,11 @@ class ManagerAgent:
             )
         self.planner = planner or RunPlanner()
         self.orchestrator = orchestrator or AgentOrchestrator(
-            RecoveryPolicy(max_retries=1, backoff_seconds=0.25)
+            RecoveryPolicy(
+                max_retries=SETTINGS.agent_max_retries,
+                backoff_seconds=SETTINGS.agent_backoff_seconds,
+                stop_on_critical_failure=SETTINGS.agent_stop_on_critical_failure,
+            )
         )
 
     def run(self):
