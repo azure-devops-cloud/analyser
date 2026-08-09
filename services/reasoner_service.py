@@ -34,14 +34,12 @@ class ReasonerService:
                 by_kind[kind]["supporting"].append(item)
             elif "BEARISH" in claim:
                 by_kind[kind]["opposing"].append(item)
-
         result = []
         for kind, sides in by_kind.items():
             if sides["supporting"] and sides["opposing"]:
                 ids = [x.get("evidence_id") for x in sides["supporting"] + sides["opposing"]]
                 result.append({
-                    "kind": kind,
-                    "type": "directional_conflict",
+                    "kind": kind, "type": "directional_conflict",
                     "evidence_ids": [x for x in ids if x],
                     "severity": "HIGH" if len(ids) >= 3 else "MEDIUM",
                     "description": f"Conflicting bullish and bearish {kind} evidence.",
@@ -67,6 +65,16 @@ class ReasonerService:
         if observed_at is not None:
             kwargs["observed_at"] = observed_at
         return Evidence(**kwargs)
+
+    def _reasoning_confidence(self, quality: float, evidence_count: int, contradictions: list[dict[str, Any]]) -> float:
+        """Confidence for the explanation layer only; never the deterministic decision."""
+        if evidence_count == 0:
+            return 0.0
+        base = quality * 100.0
+        if contradictions:
+            severity_penalty = sum(20.0 if item.get("severity") == "HIGH" else 10.0 for item in contradictions)
+            base -= min(40.0, severity_penalty)
+        return round(max(0.0, min(100.0, base)), 1)
 
     def analyze(self, decision: dict[str, Any], evidence: list[Any] | None = None) -> dict[str, Any]:
         evidence = evidence or []
@@ -120,9 +128,18 @@ class ReasonerService:
             data_quality=self._quality(relevant), contradictions=contradictions,
         )
         result = packet.as_dict()
+        reasoning_confidence = self._reasoning_confidence(
+            result.get("data_quality", 0.0), result.get("evidence_count", 0), contradictions
+        )
         result.update({
             "stance": stance,
             "evidence_status": evidence_status,
+            "reasoning_confidence": reasoning_confidence,
+            "reasoning_confidence_basis": {
+                "data_quality": result.get("data_quality", 0.0),
+                "evidence_count": result.get("evidence_count", 0),
+                "contradiction_count": len(contradictions),
+            },
             "reasoning": f"{asset} is {bias} with score {decision.get('score', 0)}. Evidence is {stance}; {len(supporting)} supporting and {len(opposing)} opposing signals were found.",
             "evidence_by_kind": {kind: len(items) for kind, items in groups.items()},
         })
