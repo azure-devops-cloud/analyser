@@ -23,6 +23,7 @@ from agents.confidence_agent import ConfidenceAgent
 from agents.risk_agent import RiskAgent
 from core.agent_orchestrator import AgentOrchestrator, RecoveryPolicy
 from core.execution_graph import ExecutionGraph
+from core.run_planner import RunPlanner
 from models.domain import AgentStatus, ExecutionMetric
 from services.logger import get_logger
 from services.metrics_service import MetricsService
@@ -33,7 +34,7 @@ logger = get_logger(__name__)
 class ManagerAgent:
     """Top-level workflow agent coordinating the autonomous agent fleet."""
 
-    def __init__(self, orchestrator=None):
+    def __init__(self, orchestrator=None, planner=None):
         self.context = AgentContext()
         self.run_id = uuid4().hex
         self.agents = [
@@ -59,6 +60,7 @@ class ManagerAgent:
         self.execution_graph = ExecutionGraph()
         for agent in self.agents:
             self.execution_graph.add_node(agent.__class__.__name__)
+        self.planner = planner or RunPlanner()
         self.orchestrator = orchestrator or AgentOrchestrator(
             RecoveryPolicy(max_retries=1, backoff_seconds=0.25)
         )
@@ -66,6 +68,7 @@ class ManagerAgent:
     def run(self):
         metrics = MetricsService()
         started_state = {}
+        plan = self.planner.plan(self.agents, self.context)
 
         def on_start(agent):
             node_name = agent.__class__.__name__
@@ -101,6 +104,10 @@ class ManagerAgent:
                     metadata={
                         "graph_node": node_name,
                         "orchestration": "autonomous",
+                        "plan_phase": next(
+                            step.phase for step in plan.steps
+                            if step.agent is agent
+                        ),
                     },
                 )
             except Exception:
@@ -112,6 +119,7 @@ class ManagerAgent:
                 self.context,
                 on_start=on_start,
                 on_result=on_result,
+                plan=plan,
             )
         finally:
             metrics.close()
@@ -121,10 +129,18 @@ class ManagerAgent:
                 "run_id": self.run_id,
                 "graph": self.execution_graph.snapshot(),
                 "orchestration": {
-                    "mode": "autonomous",
+                    "mode": plan.mode,
+                    "plan_reason": plan.reason,
+                    "planned_agents": plan.agent_names,
                     "recovery": {
                         "max_retries": self.orchestrator.recovery_policy.max_retries,
                         "backoff_seconds": self.orchestrator.recovery_policy.backoff_seconds,
+                        "retryable_patterns": list(
+                            self.orchestrator.recovery_policy.retryable_patterns
+                        ),
+                        "stop_on_critical_failure": (
+                            self.orchestrator.recovery_policy.stop_on_critical_failure
+                        ),
                     },
                 },
             }
