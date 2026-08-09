@@ -107,6 +107,16 @@ class NewsIntelligenceService:
             return "STALE"
         return "CURRENT"
 
+    @staticmethod
+    def _normalize_trust(value: Any, default: float = 0.5) -> float:
+        try:
+            score = float(value)
+        except (TypeError, ValueError):
+            score = default
+        if score > 1.0:
+            score /= 100.0
+        return max(0.0, min(1.0, score))
+
     def _score(self, item: dict[str, Any], trust: float, now: datetime | None = None, corroboration: int = 1, contradiction: bool = False) -> tuple[float, float, float]:
         title = self._clean(item.get("title"))
         words = set(re.findall(r"[a-z0-9]+", title.lower()))
@@ -199,8 +209,7 @@ class NewsIntelligenceService:
         output: list[dict[str, Any]] = []
         for item in raw_items:
             source = self._clean(item.get("source")) or self._clean(item.get("link"))
-            trust = float(source_trust.get(source, item.get("source_trust", 0.5)) or 0.5)
-            trust = max(0.0, min(1.0, trust))
+            trust = self._normalize_trust(source_trust.get(source, item.get("source_trust", 0.5)))
             group = groups.get(self._story_key(item["title"]), [item])
             sources = tuple(dict.fromkeys(self._clean(other.get("source")) or self._clean(other.get("link")) for other in group))
             title_words = set(re.findall(r"[a-z0-9]+", item["title"].lower()))
