@@ -22,7 +22,7 @@ def _format_actionable_news(results, limit=3):
     if summary_result:
         intelligence = summary_result.data.get("intelligence_brief", [])[:limit]
         if intelligence:
-            lines = ["📰 Actionable News"]
+            lines = ["📰 Actionable News — Actionable Intelligence"]
             for index, item in enumerate(intelligence, start=1):
                 affected = ", ".join(item.get("affected_assets") or []) or "Market / sector"
                 evidence = ", ".join(item.get("evidence") or []) or "Not available"
@@ -38,8 +38,8 @@ def _format_actionable_news(results, limit=3):
 
     items = _news_intelligence(results)[:limit]
     if not items:
-        return ["📰 Actionable News", "No ranked actionable news available."]
-    lines = ["📰 Actionable News"]
+        return ["📰 Actionable News — Actionable Intelligence", "No ranked actionable news available."]
+    lines = ["📰 Actionable News — Actionable Intelligence"]
     for index, item in enumerate(items, start=1):
         assets = item.get("affected_assets") or []
         affected = ", ".join(assets) if assets else "Market / sector"
