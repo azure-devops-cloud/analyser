@@ -17,13 +17,7 @@ class RecoveryPolicy:
 
 
 class AgentOrchestrator:
-    """Execute agents with bounded recovery and fail-safe continuation.
-
-    The orchestrator owns execution policy while individual agents own domain
-    behavior. A failed agent never causes an unrelated downstream agent to be
-    silently reported as successful; its failure is returned as an AgentResult
-    and the shared context remains available for degraded-mode execution.
-    """
+    """Execute agents with bounded recovery and fail-safe continuation."""
 
     def __init__(self, recovery_policy: Optional[RecoveryPolicy] = None):
         self.recovery_policy = recovery_policy or RecoveryPolicy()
@@ -32,10 +26,13 @@ class AgentOrchestrator:
         self,
         agents: Iterable,
         context,
+        on_start: Optional[Callable[[object], None]] = None,
         on_result: Optional[Callable[[AgentResult, object], None]] = None,
     ) -> list[AgentResult]:
         results = []
         for agent in agents:
+            if on_start:
+                on_start(agent)
             result = self._execute_agent(agent, context)
             results.append(result)
             if on_result:
@@ -58,7 +55,7 @@ class AgentOrchestrator:
                 if result.status == "success":
                     return result
                 last_error = "; ".join(result.errors) or "agent reported failure"
-            except Exception as exc:  # defensive boundary around third-party/domain agents
+            except Exception as exc:
                 last_error = str(exc)
                 logger.exception(
                     "Agent %s failed on attempt %s/%s",
