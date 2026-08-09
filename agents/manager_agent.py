@@ -1,5 +1,8 @@
 from models.context import AgentContext
 from agents.news_collector_agent import NewsCollectorAgent
+from agents.news_intelligence_agent import NewsIntelligenceAgent
+from agents.news_sentiment_agent import NewsSentimentAgent
+from agents.fact_validation_agent import FactValidationAgent
 from agents.deduplication_agent import DeduplicationAgent
 from agents.ranking_agent import RankingAgent
 from agents.market_agent import MarketAgent
@@ -8,8 +11,6 @@ from agents.reasoner_agent import ReasonerAgent
 from agents.alert_agent import AlertAgent
 from agents.history_agent import HistoryAgent
 from agents.calendar_agent import CalendarAgent
-from agents.news_sentiment_agent import NewsSentimentAgent
-from agents.fact_validation_agent import FactValidationAgent
 from agents.monitoring_agent import MonitoringAgent
 from agents.summary_agent import SummaryAgent
 from agents.technical_analysis_agent import TechnicalAnalysisAgent
@@ -25,12 +26,14 @@ from uuid import uuid4
 
 logger = get_logger(__name__)
 
+
 class ManagerAgent:
     def __init__(self):
         self.context = AgentContext()
         self.run_id = uuid4().hex
         self.agents = [
             NewsCollectorAgent(),
+            NewsIntelligenceAgent(),
             NewsSentimentAgent(),
             FactValidationAgent(),
             DeduplicationAgent(),
@@ -45,7 +48,7 @@ class ManagerAgent:
             AlertAgent(),
             HistoryAgent(),
             MonitoringAgent(),
-            SummaryAgent()
+            SummaryAgent(),
         ]
         self.execution_graph = ExecutionGraph()
         for agent in self.agents:
