@@ -52,7 +52,7 @@ class NewsIntelligenceService:
         "raises", "cuts", "falls", "rises", "approved", "rejected", "launches", "warns",
         "halts", "resumes", "reports", "beats", "misses", "plans", "announces",
     }
-    POSITIVE_TERMS = {"rises", "raises", "approved", "beats", "growth", "bullish", "boosts", "gains"}
+    POSITIVE_TERMS = {"rises", "raises", "approved", "beats", "growth", "bullish", "boosts", "boosting", "gains"}
     NEGATIVE_TERMS = {"falls", "cuts", "rejected", "misses", "decline", "bearish", "loss", "drops"}
 
     def __init__(self, fetcher: Callable[..., list[dict[str, Any]]] | None = None, llm_client=None):
@@ -73,11 +73,12 @@ class NewsIntelligenceService:
 
     @staticmethod
     def _story_key(title: str) -> str:
-        words = re.findall(r"[a-z0-9]+", title.lower())
+        normalized = re.sub(r"\b(?:reports?|according to|via)\s+[a-z0-9._-]+\b", " ", title.lower())
+        words = re.findall(r"[a-z0-9]+", normalized)
         stop = {
-            "the", "a", "an", "to", "of", "in", "on", "for", "and", "with", "says", "said",
+            "the", "a", "an", "to", "of", "in", "on", "for", "and", "with", "says", "said", "as",
             "after", "before", "decision", "report", "reports", "source", "officially",
-            "rises", "raises", "approved", "beats", "growth", "bullish", "boosts", "gains",
+            "rises", "raises", "approved", "beats", "growth", "bullish", "boosts", "boosting", "gains",
             "falls", "cuts", "rejected", "misses", "decline", "bearish", "loss", "drops",
         }
         return " ".join(word for word in words if word not in stop)[:180]
