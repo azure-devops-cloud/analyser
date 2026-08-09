@@ -18,11 +18,28 @@ def _news_intelligence(results):
 
 
 def _format_actionable_news(results, limit=3):
+    summary_result = next((r for r in results if r.agent == "summary_agent" and r.status == "success"), None)
+    if summary_result:
+        intelligence = summary_result.data.get("intelligence_brief", [])[:limit]
+        if intelligence:
+            lines = ["📰 Actionable Intelligence"]
+            for index, item in enumerate(intelligence, start=1):
+                affected = ", ".join(item.get("affected_assets") or []) or "Market / sector"
+                evidence = ", ".join(item.get("evidence") or []) or "Not available"
+                lines.extend([
+                    "",
+                    f"{index}. [{item.get('impact', 'LOW')}] {item.get('what_happened', 'Untitled')}",
+                    f"   Why: {item.get('why_it_matters', 'Impact requires confirmation.')}",
+                    f"   Affected: {affected}",
+                    f"   Evidence: {evidence}",
+                    f"   Next: {item.get('next_step', 'Monitor for confirmation')}",
+                ])
+            return lines
+
     items = _news_intelligence(results)[:limit]
     if not items:
-        return ["📰 Actionable News", "No ranked actionable news available."]
-
-    lines = ["📰 Actionable News"]
+        return ["📰 Actionable Intelligence", "No ranked actionable news available."]
+    lines = ["📰 Actionable Intelligence"]
     for index, item in enumerate(items, start=1):
         assets = item.get("affected_assets") or []
         affected = ", ".join(assets) if assets else "Market / sector"
@@ -49,6 +66,8 @@ def build_report(results, table_count):
         message.append(f"Lead: {data.get('top_opportunity', 'N/A')} | Posture: {data.get('market_posture', 'Neutral')}")
         message.append(f"Risk: {data.get('risk_watch', data.get('risk_caveat', 'Risk unavailable.'))}")
         message.append(f"Action: {data.get('action_recommendation', 'Action unavailable.')}")
+        if data.get("evidence_count") is not None:
+            message.append(f"Evidence: {data.get('evidence_count')} ledger records")
         alerts = data.get("alerts", [])
         if alerts:
             message.append(f"Alert: {alerts[0].get('message', 'Actionable alert available.')}")
