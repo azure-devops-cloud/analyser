@@ -25,7 +25,7 @@ def test_news_intelligence_corroborates_same_story_across_sources():
 
     assert len(result) == 2
     assert {item["corroboration_count"] for item in result} == {2}
-    assert all(len(item["corroborating_sources"]) == 1 for item in result) is False
+    assert all(set(item["corroborating_sources"]) == {"Source A", "Source B"} for item in result)
 
 
 def test_news_intelligence_detects_conflicting_directional_coverage():
@@ -70,5 +70,5 @@ def test_news_intelligence_marks_stale_news_and_caps_its_score():
     item = result[0]
     assert item["temporal_status"] == "STALE"
     assert item["freshness"] <= 0.05
-    assert item["score"] if "score" in item else True
+    assert item["score"] <= 39.9
     assert item["impact"] == "LOW"
