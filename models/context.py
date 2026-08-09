@@ -3,6 +3,7 @@ class AgentContext:
 
     def __init__(self):
         self.news = []
+        self.news_intelligence = []
         self.market = []
         self.decisions = []
         self.calendar = []
@@ -22,6 +23,9 @@ class AgentContext:
 
     def add_news(self, news):
         self.news = news
+
+    def add_news_intelligence(self, intelligence):
+        self.news_intelligence = intelligence or []
 
     def add_market(self, market):
         self.market = market

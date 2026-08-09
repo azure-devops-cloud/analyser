@@ -12,6 +12,50 @@ from agents.manager_agent import ManagerAgent
 logger = get_logger()
 
 
+def _news_intelligence(results):
+    result = next((r for r in results if r.agent == "news_intelligence_agent" and r.status == "success"), None)
+    return result.data if result else []
+
+
+def _format_actionable_news(results, limit=3):
+    summary_result = next((r for r in results if r.agent == "summary_agent" and r.status == "success"), None)
+    if summary_result:
+        intelligence = summary_result.data.get("intelligence_brief", [])[:limit]
+        if intelligence:
+            lines = ["📰 Actionable News — Actionable Intelligence"]
+            for index, item in enumerate(intelligence, start=1):
+                affected = ", ".join(item.get("affected_assets") or []) or "Market / sector"
+                evidence = ", ".join(item.get("evidence") or []) or "Not available"
+                lines.extend([
+                    "",
+                    f"{index}. [{item.get('impact', 'LOW')}] {item.get('what_happened', 'Untitled')}",
+                    f"   Why: {item.get('why_it_matters', 'Impact requires confirmation.')}",
+                    f"   Affected: {affected}",
+                    f"   Evidence: {evidence}",
+                    f"   Next: {item.get('next_step', 'Monitor for confirmation')}",
+                ])
+            return lines
+
+    items = _news_intelligence(results)[:limit]
+    if not items:
+        return ["📰 Actionable News — Actionable Intelligence", "No ranked actionable news available."]
+    lines = ["📰 Actionable News — Actionable Intelligence"]
+    for index, item in enumerate(items, start=1):
+        assets = item.get("affected_assets") or []
+        affected = ", ".join(assets) if assets else "Market / sector"
+        evidence = item.get("evidence_id", "unavailable")
+        actions = item.get("actions") or ["Monitor for confirmation"]
+        lines.extend([
+            "",
+            f"{index}. [{item.get('impact', 'LOW')}] {item.get('title', 'Untitled')}",
+            f"   Why: {item.get('why_it_matters', 'Context available; impact requires confirmation.')}",
+            f"   Affected: {affected}",
+            f"   Evidence: {evidence}",
+            f"   Next: {actions[0]}",
+        ])
+    return lines
+
+
 def build_report(results, table_count):
     message = ["🚀 MarketMind AI", "", "📊 Executive Brief", ""]
     summary_result = next((r for r in results if r.agent == "summary_agent" and r.status == "success"), None)
@@ -22,6 +66,8 @@ def build_report(results, table_count):
         message.append(f"Lead: {data.get('top_opportunity', 'N/A')} | Posture: {data.get('market_posture', 'Neutral')}")
         message.append(f"Risk: {data.get('risk_watch', data.get('risk_caveat', 'Risk unavailable.'))}")
         message.append(f"Action: {data.get('action_recommendation', 'Action unavailable.')}")
+        if data.get("evidence_count") is not None:
+            message.append(f"Evidence: {data.get('evidence_count')} ledger records")
         alerts = data.get("alerts", [])
         if alerts:
             message.append(f"Alert: {alerts[0].get('message', 'Actionable alert available.')}")
@@ -35,15 +81,25 @@ def build_report(results, table_count):
             message.append("Lead: N/A | Trend: N/A | Signal: N/A")
             message.append("Risk: data unavailable")
             message.append("Action: hold and wait")
-    message.extend(["", "💾 Database", f"Tables : {table_count}", "", "Status : Healthy ✅"])
+
+    message.extend(["", *_format_actionable_news(results), "", "💾 Database", f"Tables : {table_count}", "", "Status : Healthy ✅"])
     return "\n".join(message)
 
 
 def build_report_payload(results, table_count):
     summary = next((r.data for r in results if r.agent == "summary_agent" and r.status == "success"), {})
+    news = _news_intelligence(results)
     agent_status = {r.agent: {"status": r.status, "count": r.count, "errors": r.errors} for r in results}
     failed_agents = [name for name, result in agent_status.items() if result["status"] != "success"]
-    return {"application": "MarketMind AI", "workflow_health": "healthy" if not failed_agents else "degraded", "failed_agents": failed_agents, "database": {"table_count": table_count}, "executive_brief": summary, "agents": agent_status}
+    return {
+        "application": "MarketMind AI",
+        "workflow_health": "healthy" if not failed_agents else "degraded",
+        "failed_agents": failed_agents,
+        "database": {"table_count": table_count},
+        "executive_brief": summary,
+        "actionable_news": news[:10],
+        "agents": agent_status,
+    }
 
 
 def main(argv=None):
