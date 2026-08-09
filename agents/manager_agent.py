@@ -64,7 +64,6 @@ class ManagerAgent:
     def run(self):
         metrics = MetricsService()
         started_state = {}
-        results = []
 
         def on_start(agent):
             node_name = agent.__class__.__name__
@@ -78,7 +77,6 @@ class ManagerAgent:
             node_name = agent.__class__.__name__
             started_at, started = started_state[node_name]
             duration_ms = (perf_counter() - started) * 1000
-            results.append(result)
 
             if result.status == "success":
                 self.execution_graph.mark_success(node_name)
@@ -107,7 +105,7 @@ class ManagerAgent:
                 logger.exception("Unable to persist metric for %s", result.agent)
 
         try:
-            self.orchestrator.execute(
+            results = self.orchestrator.execute(
                 self.agents,
                 self.context,
                 on_start=on_start,
