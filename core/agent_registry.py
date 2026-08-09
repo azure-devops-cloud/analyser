@@ -8,27 +8,58 @@ from models.agent_contracts import AgentMetadata, normalize_capabilities
 class AgentRegistry:
     """Register and discover agents without coupling the planner to classes."""
 
+    DEFAULTS = {
+        "NewsCollectorAgent": ("observe", ("news.discovery", "rss.fetch"), True),
+        "NewsIntelligenceAgent": ("understand", ("news.classify", "news.relevance"), False),
+        "NewsSentimentAgent": ("understand", ("sentiment.analyze",), False),
+        "FactValidationAgent": ("verify", ("facts.validate",), False),
+        "VerificationAgent": ("verify", ("evidence.verify", "quality.score"), True),
+        "DeduplicationAgent": ("understand", ("news.deduplicate",), False),
+        "RankingAgent": ("decide", ("news.rank",), False),
+        "MarketAgent": ("observe", ("market.observe",), False),
+        "CalendarAgent": ("observe", ("macro.calendar",), False),
+        "TechnicalAnalysisAgent": ("understand", ("market.technical",), False),
+        "DecisionAgent": ("decide", ("market.decision",), True),
+        "ReasonerAgent": ("reason", ("evidence.reason",), False),
+        "ConfidenceAgent": ("verify", ("confidence.score",), False),
+        "RiskAgent": ("decide", ("risk.assess",), False),
+        "AlertAgent": ("execute", ("alert.generate",), False),
+        "HistoryAgent": ("learn", ("history.persist",), False),
+        "MonitoringAgent": ("observe", ("health.observe",), False),
+        "SummaryAgent": ("execute", ("report.compose",), False),
+    }
+
     def __init__(self, agents: Iterable | None = None):
         self._agents: dict[str, object] = {}
         for agent in agents or ():
             self.register(agent)
 
-    @staticmethod
-    def metadata_for(agent: object) -> AgentMetadata:
+    @classmethod
+    def metadata_for(cls, agent: object) -> AgentMetadata:
         describe = getattr(agent, "describe", None)
         if callable(describe):
             metadata = describe()
-            if isinstance(metadata, AgentMetadata):
+            if isinstance(metadata, AgentMetadata) and (
+                metadata.capabilities or metadata.phase != "execute" or metadata.critical
+            ):
                 return metadata
 
-        name = getattr(agent, "agent_name", None)
-        if not name:
-            name = agent.__class__.__name__
+        class_name = agent.__class__.__name__
+        phase, capabilities, critical = cls.DEFAULTS.get(
+            class_name,
+            (
+                getattr(agent, "phase", "execute"),
+                getattr(agent, "capabilities", ()),
+                getattr(agent, "critical", False),
+            ),
+        )
+        name = getattr(agent, "agent_name", None) or class_name
         return AgentMetadata(
             name=str(name),
-            phase=str(getattr(agent, "phase", "execute")),
-            capabilities=normalize_capabilities(getattr(agent, "capabilities", ())),
-            critical=bool(getattr(agent, "critical", False)),
+            phase=str(phase),
+            capabilities=normalize_capabilities(capabilities),
+            critical=bool(critical),
+            version=str(getattr(agent, "version", "1")),
         )
 
     def register(self, agent: object) -> AgentMetadata:
