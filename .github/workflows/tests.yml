@@ -25,7 +25,15 @@ jobs:
           pip install -r requirements.txt
           pip install pytest
       - name: Run test suite
-        run: python -m pytest -q
+        run: |
+          set -o pipefail
+          python -m pytest -q 2>&1 | tee pytest-output.txt
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            echo "Pytest failure summary:"
+            grep -E 'FAILED|ERROR|passed|failed|short test summary' pytest-output.txt || true
+          fi
+          exit "$status"
         env:
           PYTHONPATH: .
       - name: Report result
