@@ -20,6 +20,7 @@ class NewsItem:
     why_it_matters: str = ""
     actions: tuple[str, ...] = field(default_factory=tuple)
     evidence_id: str = ""
+    affected_assets: tuple[str, ...] = field(default_factory=tuple)
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -36,6 +37,7 @@ class NewsItem:
             "why_it_matters": self.why_it_matters,
             "actions": list(self.actions),
             "evidence_id": self.evidence_id,
+            "affected_assets": list(self.affected_assets),
         }
 
 
@@ -107,6 +109,22 @@ class NewsIntelligenceService:
             return ("Open the source for implementation details", "Check whether the change affects your stack")
         return ("Monitor for confirmation", "Compare with current market positioning")
 
+    @staticmethod
+    def _affected_assets(item: dict[str, Any]) -> tuple[str, ...]:
+        raw = item.get("affected_assets", item.get("assets", item.get("asset")))
+        if isinstance(raw, str):
+            values = [raw]
+        elif isinstance(raw, (list, tuple, set)):
+            values = list(raw)
+        else:
+            values = []
+        cleaned = []
+        for value in values:
+            value = str(value).strip().upper()
+            if value and value not in cleaned:
+                cleaned.append(value)
+        return tuple(cleaned[:5])
+
     def _enrich_with_llm(self, result: dict[str, Any]) -> dict[str, Any]:
         if not self.llm_client:
             return result
@@ -149,8 +167,8 @@ class NewsIntelligenceService:
             category = self._clean(item.get("category")) or "general"
             evidence_id = f"news-{self._fingerprint(item)}"
             result = NewsItem(
-                title=title,
-                link=link,
+                title=self._clean(item.get("title")),
+                link=self._clean(item.get("link")),
                 published=self._clean(item.get("published")),
                 source=source,
                 category=category,
@@ -162,6 +180,7 @@ class NewsIntelligenceService:
                 why_it_matters=self._why(item, impact),
                 actions=self._actions(impact, category),
                 evidence_id=evidence_id,
+                affected_assets=self._affected_assets(item),
             ).as_dict()
             output.append(self._enrich_with_llm(result))
 
