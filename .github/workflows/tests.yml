@@ -11,6 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      pull-requests: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -29,13 +30,23 @@ jobs:
           set -o pipefail
           python -m pytest -q 2>&1 | tee pytest-output.txt
           status=${PIPESTATUS[0]}
-          if [ "$status" -ne 0 ]; then
-            echo "Pytest failure summary:"
-            grep -E 'FAILED|ERROR|passed|failed|short test summary' pytest-output.txt || true
-          fi
           exit "$status"
         env:
           PYTHONPATH: .
+      - name: Publish pytest failure details
+        if: failure() && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: |
+          {
+            echo '## Pytest failure output'
+            echo
+            echo '```text'
+            tail -n 160 pytest-output.txt
+            echo '```'
+          } > pytest-comment.md
+          gh pr comment "$PR_URL" --body-file pytest-comment.md
       - name: Report result
         if: always()
         run: echo "Test workflow completed"
