@@ -5,12 +5,14 @@ on:
     branches:
       - '**'
   pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   tests:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -28,6 +30,13 @@ jobs:
         run: python -m pytest -q
         env:
           PYTHONPATH: .
-      - name: Report result
+      - name: Publish gate summary
         if: always()
-        run: echo "Test workflow completed"
+        run: |
+          {
+            echo "## CI Gate"
+            echo "- Workflow: Tests"
+            echo "- Ref: $GITHUB_REF"
+            echo "- Commit: $GITHUB_SHA"
+            echo "- Result: ${{ job.status }}"
+          } >> "$GITHUB_STEP_SUMMARY"
