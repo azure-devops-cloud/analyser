@@ -16,6 +16,7 @@ class NewsItem:
     importance: float = 0.0
     freshness: float = 0.0
     actionability: float = 0.0
+    score: float = 0.0
     impact: str = "LOW"
     why_it_matters: str = ""
     actions: tuple[str, ...] = field(default_factory=tuple)
@@ -28,24 +29,14 @@ class NewsItem:
 
     def as_dict(self) -> dict[str, Any]:
         return {
-            "title": self.title,
-            "link": self.link,
-            "published": self.published,
-            "source": self.source,
-            "category": self.category,
-            "source_trust": self.source_trust,
-            "importance": self.importance,
-            "freshness": self.freshness,
-            "actionability": self.actionability,
-            "impact": self.impact,
-            "why_it_matters": self.why_it_matters,
-            "actions": list(self.actions),
-            "evidence_id": self.evidence_id,
-            "affected_assets": list(self.affected_assets),
-            "corroboration_count": self.corroboration_count,
+            "title": self.title, "link": self.link, "published": self.published,
+            "source": self.source, "category": self.category, "source_trust": self.source_trust,
+            "importance": self.importance, "freshness": self.freshness, "actionability": self.actionability,
+            "score": self.score, "impact": self.impact, "why_it_matters": self.why_it_matters,
+            "actions": list(self.actions), "evidence_id": self.evidence_id,
+            "affected_assets": list(self.affected_assets), "corroboration_count": self.corroboration_count,
             "corroborating_sources": list(self.corroborating_sources),
-            "contradiction_detected": self.contradiction_detected,
-            "temporal_status": self.temporal_status,
+            "contradiction_detected": self.contradiction_detected, "temporal_status": self.temporal_status,
         }
 
 
@@ -83,7 +74,12 @@ class NewsIntelligenceService:
     @staticmethod
     def _story_key(title: str) -> str:
         words = re.findall(r"[a-z0-9]+", title.lower())
-        stop = {"the", "a", "an", "to", "of", "in", "on", "for", "and", "with", "says", "said"}
+        stop = {
+            "the", "a", "an", "to", "of", "in", "on", "for", "and", "with", "says", "said",
+            "after", "before", "decision", "report", "reports", "source", "officially",
+            "rises", "raises", "approved", "beats", "growth", "bullish", "boosts", "gains",
+            "falls", "cuts", "rejected", "misses", "decline", "bearish", "loss", "drops",
+        }
         return " ".join(word for word in words if word not in stop)[:180]
 
     @staticmethod
@@ -205,10 +201,7 @@ class NewsIntelligenceService:
             trust = float(source_trust.get(source, item.get("source_trust", 0.5)) or 0.5)
             trust = max(0.0, min(1.0, trust))
             group = groups.get(self._story_key(item["title"]), [item])
-            sources = tuple(dict.fromkeys(
-                self._clean(other.get("source")) or self._clean(other.get("link"))
-                for other in group
-            ))
+            sources = tuple(dict.fromkeys(self._clean(other.get("source")) or self._clean(other.get("link")) for other in group))
             title_words = set(re.findall(r"[a-z0-9]+", item["title"].lower()))
             has_positive = bool(title_words & self.POSITIVE_TERMS)
             has_negative = bool(title_words & self.NEGATIVE_TERMS)
@@ -225,14 +218,13 @@ class NewsIntelligenceService:
             category = self._clean(item.get("category")) or "general"
             evidence_id = f"news-{self._fingerprint(item)}"
             result = NewsItem(
-                title=item["title"], link=item["link"], published=self._clean(item.get("published")),
-                source=source, category=category, source_trust=trust, importance=importance,
-                freshness=freshness, actionability=actionability, impact=impact,
+                title=item["title"], link=item["link"], published=self._clean(item.get("published")), source=source,
+                category=category, source_trust=trust, importance=importance, freshness=freshness,
+                actionability=actionability, score=score, impact=impact,
                 why_it_matters=self._why(item, impact, len(group), contradiction),
-                actions=self._actions(impact, category, len(group), contradiction),
-                evidence_id=evidence_id, affected_assets=self._affected_assets(item),
-                corroboration_count=len(group), corroborating_sources=sources,
-                contradiction_detected=contradiction, temporal_status=temporal_status,
+                actions=self._actions(impact, category, len(group), contradiction), evidence_id=evidence_id,
+                affected_assets=self._affected_assets(item), corroboration_count=len(group),
+                corroborating_sources=sources, contradiction_detected=contradiction, temporal_status=temporal_status,
             ).as_dict()
             output.append(self._enrich_with_llm(result))
 
