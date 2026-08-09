@@ -72,3 +72,22 @@ def test_news_intelligence_marks_stale_news_and_caps_its_score():
     assert item["freshness"] <= 0.05
     assert item["score"] <= 39.9
     assert item["impact"] == "LOW"
+
+
+def test_news_intelligence_normalizes_source_trust_percentages():
+    service = NewsIntelligenceService()
+    result = service.analyze(
+        [
+            {
+                "title": "Fed announces rate decision",
+                "link": "https://a.example/1",
+                "source": "Trusted Source",
+                "published": "2026-08-09T00:00:00Z",
+            }
+        ],
+        source_trust={"Trusted Source": 95},
+        now=datetime(2026, 8, 9, 1, tzinfo=timezone.utc),
+    )
+
+    assert result[0]["source_trust"] == 0.95
+    assert result[0]["score"] > 50
