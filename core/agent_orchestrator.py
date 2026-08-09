@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from re import sub
+from re import search, sub
 from time import sleep
 from typing import Callable, Iterable, Optional
 
@@ -15,10 +15,23 @@ class RecoveryPolicy:
 
     max_retries: int = 1
     backoff_seconds: float = 0.25
+    retryable_patterns: tuple[str, ...] = (
+        "temporary",
+        "timeout",
+        "timed out",
+        "unavailable",
+        "rate limit",
+        "429",
+        "502",
+        "503",
+        "504",
+        "connection",
+    )
+    stop_on_critical_failure: bool = False
 
 
 class AgentOrchestrator:
-    """Execute agents with bounded recovery and fail-safe continuation."""
+    """Execute planned agents with bounded recovery and fail-safe continuation."""
 
     def __init__(self, recovery_policy: Optional[RecoveryPolicy] = None):
         self.recovery_policy = recovery_policy or RecoveryPolicy()
@@ -29,15 +42,33 @@ class AgentOrchestrator:
         context,
         on_start: Optional[Callable[[object], None]] = None,
         on_result: Optional[Callable[[AgentResult, object], None]] = None,
+        plan=None,
     ) -> list[AgentResult]:
         results = []
-        for agent in agents:
+        steps = list(plan.steps) if plan is not None else [
+            type("ExecutionStep", (), {"agent": agent, "critical": False})
+            for agent in agents
+        ]
+
+        for step in steps:
+            agent = step.agent
             if on_start:
                 on_start(agent)
             result = self._execute_agent(agent, context)
             results.append(result)
             if on_result:
                 on_result(result, agent)
+
+            if (
+                result.status == "failed"
+                and getattr(step, "critical", False)
+                and self.recovery_policy.stop_on_critical_failure
+            ):
+                logger.error(
+                    "Stopping autonomous plan after critical agent failure: %s",
+                    result.agent,
+                )
+                break
         return results
 
     @staticmethod
@@ -48,6 +79,10 @@ class AgentOrchestrator:
             return explicit
         class_name = agent.__class__.__name__
         return sub(r"(?<!^)(?=[A-Z])", "_", class_name).lower()
+
+    def _is_retryable(self, message: str) -> bool:
+        normalized = (message or "").lower()
+        return any(search(pattern, normalized) for pattern in self.recovery_policy.retryable_patterns)
 
     def _execute_agent(self, agent, context) -> AgentResult:
         attempts = self.recovery_policy.max_retries + 1
@@ -74,7 +109,10 @@ class AgentOrchestrator:
                     attempts,
                 )
 
-            if attempt < attempts and self.recovery_policy.backoff_seconds > 0:
+            if attempt >= attempts or not self._is_retryable(last_error):
+                break
+
+            if self.recovery_policy.backoff_seconds > 0:
                 sleep(self.recovery_policy.backoff_seconds * attempt)
 
         return AgentResult(
