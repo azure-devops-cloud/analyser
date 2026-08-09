@@ -7,6 +7,7 @@ from agents.news_collector_agent import NewsCollectorAgent
 from agents.news_intelligence_agent import NewsIntelligenceAgent
 from agents.news_sentiment_agent import NewsSentimentAgent
 from agents.fact_validation_agent import FactValidationAgent
+from agents.verification_agent import VerificationAgent
 from agents.deduplication_agent import DeduplicationAgent
 from agents.ranking_agent import RankingAgent
 from agents.market_agent import MarketAgent
@@ -40,6 +41,7 @@ class ManagerAgent:
             NewsIntelligenceAgent(),
             NewsSentimentAgent(),
             FactValidationAgent(),
+            VerificationAgent(),
             DeduplicationAgent(),
             RankingAgent(),
             MarketAgent(),
