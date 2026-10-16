@@ -1,5 +1,9 @@
 from dataclasses import dataclass, field
 from typing import Iterable, List, Mapping, Sequence
+from uuid import uuid4
+
+from core.agent_registry import AgentRegistry
+from models.agent_contracts import AgentTask
 
 
 @dataclass(frozen=True)
@@ -10,6 +14,7 @@ class PlanStep:
     phase: str
     critical: bool = False
     tags: Sequence[str] = field(default_factory=tuple)
+    task: AgentTask | None = None
 
 
 @dataclass(frozen=True)
@@ -19,18 +24,19 @@ class RunPlan:
     mode: str
     steps: Sequence[PlanStep]
     reason: str
+    plan_id: str = field(default_factory=lambda: uuid4().hex)
 
     @property
     def agent_names(self) -> List[str]:
-        return [step.agent.__class__.__name__ for step in self.steps]
+        return [step.task.agent if step.task else step.agent.__class__.__name__ for step in self.steps]
 
 
 class RunPlanner:
-    """Build a safe, deterministic execution plan from available agents.
+    """Build a deterministic control-plane plan from agent capabilities.
 
-    Planning remains deterministic infrastructure: an LLM is deliberately not
-    used to decide execution order or safety boundaries. Agents can evolve
-    independently while the planner provides an auditable control-plane layer.
+    The planner does not ask an LLM to decide safety boundaries. Intelligence
+    remains inside agents, while phases, criticality, and task identity remain
+    deterministic and auditable.
     """
 
     _PHASES = {
@@ -57,22 +63,30 @@ class RunPlanner:
     _CRITICAL = {"NewsCollectorAgent", "VerificationAgent", "DecisionAgent"}
 
     def plan(self, agents: Iterable, context: Mapping | object) -> RunPlan:
-        """Return the supplied workflow in a validated, auditable plan.
-
-        The planner preserves the declared dependency-safe order. Unknown
-        agents are allowed and receive a neutral phase so the architecture is
-        extensible without requiring a central registry change.
-        """
+        """Return a validated, traceable plan without changing workflow order."""
+        agents = tuple(agents)
+        registry = AgentRegistry(agents)
+        run_id = getattr(context, "run_id", uuid4().hex)
         steps = []
+
         for agent in agents:
-            name = agent.__class__.__name__
-            phase = self._PHASES.get(name, "execute")
+            metadata = registry.metadata_for(agent)
+            fallback_name = agent.__class__.__name__
+            phase = metadata.phase or self._PHASES.get(fallback_name, "execute")
+            critical = metadata.critical or fallback_name in self._CRITICAL
+            task = AgentTask(
+                agent=metadata.name,
+                phase=phase,
+                run_id=run_id,
+                inputs={"capabilities": list(metadata.capabilities)},
+            )
             steps.append(
                 PlanStep(
                     agent=agent,
                     phase=phase,
-                    critical=name in self._CRITICAL,
-                    tags=(phase,),
+                    critical=critical,
+                    tags=(phase, *metadata.capabilities),
+                    task=task,
                 )
             )
 
@@ -82,5 +96,5 @@ class RunPlanner:
         return RunPlan(
             mode="autonomous",
             steps=tuple(steps),
-            reason="Dependency-safe workflow selected by deterministic control policy",
+            reason="Capability-aware deterministic control policy selected the supplied dependency-safe workflow",
         )
